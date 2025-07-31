@@ -33,6 +33,8 @@ public class AmbulanceEntity {
     @Enumerated(EnumType.STRING)
     private AmbulanceStatus status;
 
+    private String license;
+
     @Column(columnDefinition = "GEOGRAPHY(Point,4326)")
     private Point location;
 

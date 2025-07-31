@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import reactLogo from './../../assets/react-logo.png';
+import FireAdmin from './../../assets/FireAdmin.png';
+import { toast } from 'react-toastify';
 import {
   FireIcon,
   BuildingOfficeIcon,
@@ -20,9 +23,24 @@ import {
   ClipboardDocumentListIcon,
   MagnifyingGlassIcon,
   PencilIcon,
-  ShieldCheckIcon
+  ShieldCheckIcon,
+  HomeIcon,
+  ArrowRightOnRectangleIcon,
+  GlobeAltIcon,
+  UserGroupIcon,
+  ExclamationCircleIcon,
+  UserCircleIcon,
+  Bars3BottomLeftIcon,
+  PlusCircleIcon,
+  IdentificationIcon,
+  EnvelopeIcon,
+  KeyIcon,
+  CalendarDaysIcon,
+  CurrencyDollarIcon,
+  ClipboardDocumentCheckIcon
 } from '@heroicons/react/24/outline';
 
+import { User, Phone, Mail, Fingerprint, IdCard } from 'lucide-react';
 function decodeJWT(token) {
   if (!token) return {};
   try {
@@ -76,6 +94,16 @@ function SectionHeader({ icon, title }) {
   );
 }
 
+const ProfileItem = ({ icon, label, value }) => (
+  <div className="flex items-center justify-between pt-2">
+    <div className="flex items-center gap-2 text-gray-500">
+      {icon}
+      <dt className="font-medium">{label}</dt>
+    </div>
+    <dd className="text-gray-900 font-semibold">{value || 'N/A'}</dd>
+  </div>
+);
+
 export default function FireDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
@@ -93,18 +121,55 @@ export default function FireDashboard() {
     stationId: '',
     truckId: ''
   });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    validateField(name, value);
+  };
+
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    validateField(name, value);
+  };
+
+  
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [profileData, setProfileData] = useState({
-    name: 'Firefighter Sarah Johnson',
-    badge: 'F-2024-001',
-    rank: 'Senior Firefighter',
-    department: 'Fire Rescue Division',
-    experience: '12 years',
-    email: 'sarah.johnson@fire.gov',
-    phone: '+1 (555) 987-6543'
+    id: '',
+  fullName: '',
+  email: '',
+  phoneNumber: '',
+  governmentId: ''
   });
+  const [form, setForm] = useState({
+  fullName: '',
+  email: '',
+  phoneNumber: '',
+  governmentId: '',
+  password: '',
+  licenseNumber: '',
+  vehicleRegNumber: '',
+  fireStationId: '',  // instead of hospitalID
+  securityQuestion: 'PET_NAME',  // default selection
+  securityAnswer: '',
+});
+ // New state for individual input errors
+  const [formErrors, setFormErrors] = useState({
+     fullName: '',
+        email: '',
+        phoneNumber: '',
+        governmentId: '',
+        password: '',
+        licenseNumber: '',
+        vehicleRegNumber: '',
+        fireStationId: '',
+        securityQuestion: '',
+        securityAnswer: ''
+  });
+
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState(null);
   const [reportTruckHistory, setReportTruckHistory] = useState([]);
@@ -162,7 +227,11 @@ export default function FireDashboard() {
 
   const latRegex = /^-?([1-8]?\d(\.\d+)?|90(\.0+)?)$/;
   const lonRegex = /^-?((1?[0-7]?\d(\.\d+)?)|180(\.0+)?)$/;
-
+  // Fetch profile data when profile tab is active
+  useEffect(() => {
+      fetchAdminProfile();
+    
+  }, []);
   useEffect(() => {
     setStatsLoading(true);
     setStatsError('');
@@ -216,7 +285,7 @@ export default function FireDashboard() {
   // Fetch profile data when profile tab is active
   useEffect(() => {
     if (activeTab === 'profile') {
-      fetchFireTruckDriverProfile();
+      fetchAdminProfile();
     }
   }, [activeTab]);
 
@@ -333,14 +402,7 @@ export default function FireDashboard() {
     validateQueryField(name, value);
   };
 
-  const stationRankings = [
-    { name: 'Central Fire Station', score: 98, trucks: 8, calls: 234, responseTime: '2.8 min' },
-    { name: 'North Fire Station', score: 95, trucks: 6, calls: 189, responseTime: '3.1 min' },
-    { name: 'South Fire Station', score: 92, trucks: 7, calls: 201, responseTime: '3.3 min' },
-    { name: 'East Fire Station', score: 89, trucks: 5, calls: 156, responseTime: '3.6 min' },
-    { name: 'West Fire Station', score: 86, trucks: 6, calls: 178, responseTime: '3.9 min' },
-    { name: 'Downtown Fire Station', score: 83, trucks: 10, calls: 267, responseTime: '4.2 min' }
-  ];
+ 
 
   const handleStationSubmit = async (e) => {
     e.preventDefault();
@@ -435,6 +497,70 @@ export default function FireDashboard() {
       setLoading(false);
     }
   };
+
+
+   const handleFireDriverSubmit = async (e) => {
+  e.preventDefault();
+  setMessage('');
+
+  if (!validateAllRegistrationFields()) {
+    setMessage('Please correct the errors in the form before submitting.');
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const body = {
+      ...form,
+      fireStationId: Number(form.fireStationId),
+      securityQuestion: form.securityQuestion,
+      securityAnswer: form.securityAnswer
+    };
+
+    const res = await fetch('http://localhost:8080/auth/register/fire-driver', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (res.ok) {
+      setMessage('Fire driver registered successfully!');
+      setForm({
+        fullName: '',
+        email: '',
+        phoneNumber: '',
+        governmentId: '',
+        password: '',
+        licenseNumber: '',
+        vehicleRegNumber: '',
+        fireStationId: '',
+        securityQuestion: '',
+        securityAnswer: ''
+      });
+      setFormErrors({
+        fullName: '',
+        email: '',
+        phoneNumber: '',
+        governmentId: '',
+        password: '',
+        licenseNumber: '',
+        vehicleRegNumber: '',
+        fireStationId: '',
+        securityQuestion: '',
+        securityAnswer: ''
+      });
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setMessage(data.message || 'Registration failed.');
+    }
+  } catch (err) {
+    console.error('Error during fire driver registration:', err);
+    setMessage('Network error. Please check your connection.');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleGetTrucks = async () => {
     if (!queryForm.stationId.toString().trim() || !validateQueryField('stationId', queryForm.stationId)) {
@@ -688,44 +814,42 @@ export default function FireDashboard() {
     }
   };
 
-  const fetchFireTruckDriverProfile = async () => {
-    setProfileLoading(true);
-    setProfileError(null);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8080/fire/truck-driver/v1/me', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setProfileData({
-          name: data.name || 'Firefighter Name',
-          badge: data.badgeNumber || 'N/A',
-          rank: data.rank || 'N/A',
-          department: data.department || 'N/A',
-          experience: data.experience || 'N/A',
-          email: data.email || 'N/A',
-          phone: data.phone || 'N/A'
-        });
-      } else {
-        const errorData = await response.json();
-        setProfileError(errorData.message || 'Failed to fetch profile data');
-        toast.error('Failed to fetch profile data');
-      }
-    } catch (error) {
-      console.error('Error fetching fire truck driver profile:', error);
-      setProfileError('Failed to fetch profile data');
-      toast.error('Failed to fetch profile data');
-    } finally {
-      setProfileLoading(false);
-    }
-  };
-
+   const fetchAdminProfile = async () => {
+     setProfileLoading(true);
+     setProfileError(null);
+     try {
+       const token = localStorage.getItem('jwt');
+       const response = await fetch('http://localhost:8080/api/user/me', {
+         method: 'GET',
+         headers: {
+           'Authorization': `Bearer ${token}`,
+           'Content-Type': 'application/json'
+         },
+       });
+ 
+       if (response.ok) {
+         const data = await response.json();
+         console.log(data);
+         setProfileData({
+         id: data.id || 'N/A',
+         fullName: data.fullName || 'N/A',
+         email: data.email || 'N/A',
+         phoneNumber: data.phoneNumber || 'N/A',
+         governmentId: data.governmentId || 'N/A',
+       });
+       } else {
+         const errorData = await response.json();
+         setProfileError(errorData.message || 'Failed to fetch profile data');
+         toast.error('Failed to fetch profile data');
+       }
+     } catch (error) {
+       console.error('Error fetching ambulance driver profile:', error);
+       setProfileError('Failed to fetch profile data');
+       toast.error('Failed to fetch profile data');
+     } finally {
+       setProfileLoading(false);
+     }
+   };
   // Function to fetch truck details by ID
   const fetchTruckDetails = async () => {
     if (!selectedTruckId.toString().trim()) {
@@ -952,71 +1076,105 @@ export default function FireDashboard() {
   const userInfo = decodeJWT(jwt);
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-900"> {/* Lighter base background */}
+  <div className="min-h-screen bg-[#E8E6E0] font-inter text-gray-800">
+
+     <style>
+        {`
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+          .font-inter {
+            font-family: 'Inter', sans-serif;
+          }
+        `}
+      </style>
       {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200"> {/* White header with subtle shadow */}
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">Fire Dashboard</h1> {/* Dark text */}
-              <p className="text-gray-500">Emergency Response Management System</p> {/* Muted text */}
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm text-gray-600">Welcome, {profileData.name.split(' ')[1]}</p>
-                <p className="text-xs text-gray-500">Last updated: {new Date().toLocaleTimeString()}</p>
-              </div>
-              <button
-                onClick={() => {
-                  localStorage.removeItem('jwt');
-                  localStorage.removeItem('token');
-                  navigate('/login');
-                }}
-                className="text-gray-600 hover:text-gray-800 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
-              >
-                Logout
-              </button>
-              <button
-                onClick={() => setActiveTab('profile')}
-                className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold hover:bg-blue-600 transition" // Blue accent for profile icon
-              >
-                <UserIcon className="h-6 w-6" />
-              </button>
-            </div>
-          </div>
-        </div>
+      <div className="border-b border-gray-200">
+  {/* Header Top Bar */}
+  <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+    
+    {/* Left - Logo + Title */}
+    <div className="flex items-center gap-4">
+      <img
+        src={reactLogo} // Use your fire dashboard logo here
+        alt="Logo"
+        className="h-14 w-14 object-contain rounded-xl bg-white p-2 shadow-sm"
+      />
+      <div>
+        <h1 className="text-xl font-semibold text-gray-800">Fire Admin Dashboard</h1>
+        <p className="text-sm text-gray-500">Emergency Response Management System</p>
       </div>
+    </div>
+
+    {/* Right - User Info & Actions */}
+    <div className="flex items-center gap-6">
+      
+      {/* User Info */}
+     <div className="text-right">
+              <p className="text-sm text-gray-600">Wecome {profileData.fullName}</p>
+              <p className="text-xs text-gray-400">Updated: {new Date().toLocaleTimeString()}</p>
+       </div>
+
+      {/* Admin Avatar */}
+      <img
+        src={FireAdmin} // <-- replace with actual Fire admin avatar if different
+        alt="Admin"
+        className="h-10 w-10 rounded-full object-cover border-2 border-white shadow"
+      />
+
+      {/* Icon Actions */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => navigate('/')}
+          title="Home"
+          className="text-gray-600 hover:text-orange-600 transition"
+        >
+          <HomeIcon className="h-6 w-6" />
+        </button>
+        <button
+          onClick={() => {
+            localStorage.removeItem('jwt');
+            localStorage.removeItem('token');
+            navigate('/login');
+          }}
+          title="Logout"
+          className="text-red-600 hover:text-red-800 transition"
+        >
+          <ArrowRightOnRectangleIcon className="h-6 w-6" />
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
       {/* Navigation Tabs */}
-      <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4">
-          <nav className="flex space-x-8">
-            {[
-              { id: 'overview', name: 'Overview', icon: <ChartBarIcon className="h-5 w-5" /> },
-              { id: 'stations', name: 'Stations', icon: <BuildingOfficeIcon className="h-5 w-5" /> },
-              { id: 'trucks', name: 'Trucks', icon: <TruckIcon className="h-5 w-5" /> },
-              { id: 'management', name: 'Management', icon: <MagnifyingGlassIcon className="h-5 w-5" /> },
-              { id: 'emergencies', name: 'Emergencies', icon: <FireIcon className="h-5 w-5" /> },
-              { id: 'reports', name: 'Reports', icon: <DocumentTextIcon className="h-5 w-5" /> },
-              { id: 'ranking', name: 'Rankings', icon: <TrophyIcon className="h-5 w-5" /> },
-              { id: 'profile', name: 'Profile', icon: <UserIcon className="h-5 w-5" /> }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 flex items-center space-x-2 font-medium text-sm transition-colors duration-200 ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600' // Blue accent for active tab
-                    : 'border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300'
-                }`}
-              >
-                <span>{tab.icon}</span>
-                <span>{tab.name}</span>
-              </button>
-            ))}
-          </nav>
-        </div>
+      <div className="w-full flex justify-center my-6">
+        <nav className="bg-orange-50 border border-orange-200 rounded-full shadow-md px-4 py-2 flex space-x-4 overflow-x-auto max-w-6xl">
+          {[
+            { id: 'overview', name: 'Overview', icon: <ChartBarIcon className="h-5 w-5" /> },
+            { id: 'stations', name: 'Stations', icon: <BuildingOfficeIcon className="h-5 w-5" /> },
+            { id: 'trucks', name: 'Trucks', icon: <TruckIcon className="h-5 w-5" /> },
+            { id: 'management', name: 'Management', icon: <MagnifyingGlassIcon className="h-5 w-5" /> },
+            { id: 'emergencies', name: 'Emergencies', icon: <FireIcon className="h-5 w-5 text-red-600" /> },
+            { id: 'profile', name: 'Profile', icon: <UserIcon className="h-5 w-5" /> },
+            { id: 'register', name: 'Register', icon: <PlusCircleIcon className="h-5 w-5" /> },
+
+          ].map((tab) => (
+            <motion.button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
+                ${activeTab === tab.id
+                  ? 'bg-orange-100 text-orange-700 border-orange-300'
+                  : 'text-gray-600 border-transparent hover:bg-orange-100 hover:text-orange-600'}`}
+            >
+              {tab.icon}
+              {tab.name}
+            </motion.button>
+          ))}
+        </nav>
       </div>
+
+
 
       {/* Main Content */}
       <motion.div
@@ -1026,7 +1184,62 @@ export default function FireDashboard() {
         animate="visible"
       >
         {activeTab === 'overview' && (
-          <motion.div className="space-y-8" variants={itemVariants}>
+          <motion.div className="space-y-10" variants={itemVariants}>
+            
+
+            {/* Quick Actions */}
+            <div>
+              <SectionHeader icon={<ClipboardDocumentListIcon />} title="Quick Actions" />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                 <QuickActionCard
+                  title="Register Driver"
+                  description="Add a new fire truck driver"
+                  icon={<UserGroupIcon className="h-6 w-6" />}
+                  onClick={() => setActiveTab('register')}
+                  bgColorClass="bg-white"
+                />
+                
+                <QuickActionCard
+                  title="Add Station"
+                  description="Create a new fire station"
+                  icon={<PlusIcon className="h-6 w-6" />}
+                  onClick={() => setActiveTab('add-station')}
+                  bgColorClass="bg-white"
+                />
+                <QuickActionCard
+                  title="Update Location"
+                  description="Update truck locations"
+                  icon={<MapPinIcon className="h-6 w-6" />}
+                  onClick={() => setActiveTab('update-location')}
+                  bgColorClass="bg-white"
+                />
+                <QuickActionCard
+                  title="View Emergencies"
+                  description="Monitor active emergencies"
+                  icon={<FireIcon className="h-6 w-6" />}
+                  onClick={() => setActiveTab('emergencies')}
+                  bgColorClass="bg-white"
+                />
+              
+    
+                <QuickActionCard
+                  title="My Profile"
+                  description="Update personal information"
+                  icon={<UserIcon className="h-6 w-6" />}
+                  onClick={() => setActiveTab('profile')}
+                  bgColorClass="bg-white"
+                />
+                <QuickActionCard
+                  title="Emergency Contacts"
+                  description="Quick contact list"
+                  icon={<PhoneIcon className="h-6 w-6" />}
+                  onClick={() => alert('Emergency contacts feature coming soon!')}
+                  bgColorClass="bg-white"
+                />
+              </div>
+            </div>
+
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {statsLoading ? (
@@ -1065,62 +1278,6 @@ export default function FireDashboard() {
                   />
                 </>
               ) : null}
-            </div>
-
-            {/* Quick Actions */}
-            <div>
-              <SectionHeader icon={<ClipboardDocumentListIcon />} title="Quick Actions" />
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <QuickActionCard
-                  title="Add Station"
-                  description="Create a new fire station"
-                  icon={<PlusIcon className="h-6 w-6" />}
-                  onClick={() => setActiveTab('add-station')}
-                  bgColorClass="bg-white"
-                />
-                <QuickActionCard
-                  title="Update Location"
-                  description="Update truck locations"
-                  icon={<MapPinIcon className="h-6 w-6" />}
-                  onClick={() => setActiveTab('update-location')}
-                  bgColorClass="bg-white"
-                />
-                <QuickActionCard
-                  title="View Emergencies"
-                  description="Monitor active emergencies"
-                  icon={<FireIcon className="h-6 w-6" />}
-                  onClick={() => setActiveTab('emergencies')}
-                  bgColorClass="bg-white"
-                />
-                <QuickActionCard
-                  title="Generate Reports"
-                  description="Create incident reports"
-                  icon={<DocumentTextIcon className="h-6 w-6" />}
-                  onClick={() => setActiveTab('reports')}
-                  bgColorClass="bg-white"
-                />
-                <QuickActionCard
-                  title="Station Rankings"
-                  description="View performance metrics"
-                  icon={<TrophyIcon className="h-6 w-6" />}
-                  onClick={() => setActiveTab('ranking')}
-                  bgColorClass="bg-white"
-                />
-                <QuickActionCard
-                  title="My Profile"
-                  description="Update personal information"
-                  icon={<UserIcon className="h-6 w-6" />}
-                  onClick={() => setActiveTab('profile')}
-                  bgColorClass="bg-white"
-                />
-                <QuickActionCard
-                  title="Emergency Contacts"
-                  description="Quick contact list"
-                  icon={<PhoneIcon className="h-6 w-6" />}
-                  onClick={() => alert('Emergency contacts feature coming soon!')}
-                  bgColorClass="bg-white"
-                />
-              </div>
             </div>
 
             {/* Recent Activity */}
@@ -2293,191 +2450,16 @@ export default function FireDashboard() {
           </motion.div>
         )}
 
-        {activeTab === 'reports' && (
-          <motion.div className="bg-white rounded-lg shadow-md p-6" variants={containerVariants} initial="hidden" animate="visible">
-            <SectionHeader icon={<DocumentTextIcon />} title="Reports" />
-            <motion.div className="flex items-center mb-6 space-x-3" variants={itemVariants}>
-              <input
-                type="number"
-                min="1"
-                placeholder="Enter Truck ID"
-                value={reportTruckId}
-                onChange={e => setReportTruckId(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 w-60"
-              />
-              <motion.button
-                onClick={fetchReportTruckHistory}
-                disabled={reportLoading}
-                className="bg-blue-500 text-white px-5 py-2 rounded-md hover:bg-blue-600 disabled:opacity-50 transition-colors duration-200 flex items-center space-x-2"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                {reportLoading ? (
-                  <>
-                    <svg className="animate-spin h-5 w-5 mr-3 inline" viewBox="0 0 24 24"> {/* Spinner */} </svg>
-                    <span>Loading...</span>
-                  </>
-                ) : (
-                  <>
-                    <ClipboardDocumentListIcon className="h-5 w-5" />
-                    <span>Get Truck History</span>
-                  </>
-                )}
-              </motion.button>
-            </motion.div>
-            {reportError && (
-              <motion.div
-                className="mb-4 p-4 rounded-md bg-red-100 text-red-700 border border-red-200 flex items-center space-x-2"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <InformationCircleIcon className="h-5 w-5" /> <span>{reportError}</span>
-              </motion.div>
-            )}
-            {reportTruckHistory && Array.isArray(reportTruckHistory) && reportTruckHistory.length > 0 ? (
-              <motion.div className="overflow-x-auto border border-gray-200 rounded-lg" variants={itemVariants}>
-                <motion.table className="w-full text-sm bg-white" initial="hidden" animate="visible" variants={containerVariants}>
-                  <motion.thead className="bg-gray-50" variants={itemVariants}> {/* Minimal table header */}
-                    <tr>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Booking ID</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Pickup Location</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Issue Type</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Status</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Created At</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Victim Phone</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Requested By</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">For Self</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Ambulance</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Police</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Fire Brigade</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Ambulance Count</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Police Count</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Fire Truck Count</th>
-                    </tr>
-                  </motion.thead>
-                  <motion.tbody className="bg-white">
-                    {reportTruckHistory.map((item, idx) => (
-                      <motion.tr key={idx} className="hover:bg-gray-50 border-b border-gray-100 last:border-b-0" variants={itemVariants}>
-                        <td className="px-4 py-3">{item.booking_id}</td>
-                        <td className="px-4 py-3 text-xs text-gray-500">{item.pickup_latitude?.toFixed(4)}, {item.pickup_longitude?.toFixed(4)}</td>
-                        <td className="px-4 py-3">{item.issue_type}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            item.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                              item.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                                'bg-gray-100 text-gray-800'
-                          }`}>
-                            {item.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-500">{new Date(item.created_at).toLocaleString()}</td>
-                        <td className="px-4 py-3">{item.victim_phone_number}</td>
-                        <td className="px-4 py-3">{item.requested_by_user_id}</td>
-                        <td className="px-4 py-3">{item.is_for_self ? 'Yes' : 'No'}</td>
-                        <td className="px-4 py-3">{item.needs_ambulance ? 'Yes' : 'No'}</td>
-                        <td className="px-4 py-3">{item.needs_police ? 'Yes' : 'No'}</td>
-                        <td className="px-4 py-3">{item.needs_fire_brigade ? 'Yes' : 'No'}</td>
-                        <td className="px-4 py-3">{item.requested_ambulance_count}</td>
-                        <td className="px-4 py-3">{item.requested_police_count}</td>
-                        <td className="px-4 py-3">{item.requested_fire_truck_count}</td>
-                      </motion.tr>
-                    ))}
-                  </motion.tbody>
-                </motion.table>
-              </motion.div>
-            ) : (
-              !reportLoading && <motion.p className="text-gray-600 mt-4" variants={itemVariants}>No truck history data available. Enter a truck ID and click the button above to fetch.</motion.p>
-            )}
-          </motion.div>
-        )}
-
-        {activeTab === 'ranking' && (
-          <motion.div className="space-y-8" variants={containerVariants} initial="hidden" animate="visible">
-            <div className="flex items-center justify-between">
-              <SectionHeader icon={<TrophyIcon />} title="Station Rankings" />
-              <div className="text-sm text-gray-600">Performance Metrics</div>
-            </div>
-
-            {/* Top Performers */}
-            <motion.div className="bg-white rounded-lg shadow-md p-6" variants={itemVariants}>
-              <h3 className="text-xl font-semibold text-gray-800 mb-4">Top Performing Stations</h3>
-              <div className="space-y-4">
-                {stationRankings.slice(0, 3).map((station, index) => (
-                  <motion.div
-                    key={index}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors duration-200"
-                    variants={itemVariants}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg ${
-                        index === 0 ? 'bg-amber-400' : index === 1 ? 'bg-gray-400' : 'bg-blue-400' // Desaturated gold, silver, bronze
-                      }`}>
-                        {index + 1}
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-gray-900">{station.name}</h4>
-                        <p className="text-sm text-gray-600">Score: {station.score}/100</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-green-600">{station.responseTime}</div>
-                      <div className="text-xs text-gray-500">Response Time</div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-
-            {/* Detailed Rankings */}
-            <motion.div className="bg-white rounded-lg shadow-md p-6" variants={itemVariants}>
-              <h3 className="text-xl font-semibold text-gray-800 mb-4">Complete Rankings</h3>
-              <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                <motion.table className="w-full text-sm bg-white" initial="hidden" animate="visible" variants={containerVariants}>
-                  <motion.thead className="bg-gray-50" variants={itemVariants}> {/* Minimal table header */}
-                    <tr>
-                      <th className="text-left py-3 px-4 text-gray-700">Rank</th>
-                      <th className="text-left py-3 px-4 text-gray-700">Station</th>
-                      <th className="text-left py-3 px-4 text-gray-700">Score</th>
-                      <th className="text-left py-3 px-4 text-gray-700">Trucks</th>
-                      <th className="text-left py-3 px-4 text-gray-700">Calls</th>
-                      <th className="text-left py-3 px-4 text-gray-700">Response Time</th>
-                    </tr>
-                  </motion.thead>
-                  <motion.tbody className="bg-white">
-                    {stationRankings.map((station, index) => (
-                      <motion.tr key={index} className="border-b border-gray-100 hover:bg-gray-50 last:border-b-0" variants={itemVariants}>
-                        <td className="py-3 px-4 font-semibold text-gray-800">{index + 1}</td>
-                        <td className="py-3 px-4">{station.name}</td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center space-x-2">
-                            <div className="w-20 bg-gray-200 rounded-full h-2">
-                              <div
-                                className="bg-blue-500 h-2 rounded-full" // Use blue accent for progress bar
-                                style={{ width: `${station.score}%` }}
-                              ></div>
-                            </div>
-                            <span className="text-sm text-gray-700">{station.score}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">{station.trucks}</td>
-                        <td className="py-3 px-4">{station.calls}</td>
-                        <td className="py-3 px-4 text-green-600 font-semibold">{station.responseTime}</td>
-                      </motion.tr>
-                    ))}
-                  </motion.tbody>
-                </motion.table>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-
+       
         {activeTab === 'profile' && (
-          <motion.div className="max-w-4xl mx-auto" variants={containerVariants} initial="hidden" animate="visible">
+          <motion.div 
+          className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 " 
+          variants={containerVariants}
+           initial="hidden"
+           animate="visible">
             <div className="bg-white rounded-lg shadow-md p-8">
               <div className="flex items-center justify-between mb-6">
-                <SectionHeader icon={<UserIcon />} title="Firefighter Profile" />
+                <SectionHeader icon={<UserIcon />} title="Profile" />
                 <button className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center space-x-1">
                   <PencilIcon className="h-4 w-4" /> <span>Edit Profile</span>
                 </button>
@@ -2495,131 +2477,295 @@ export default function FireDashboard() {
                 </motion.div>
               )}
 
-              {!profileLoading && !profileError && (
+             {!profileLoading && !profileError && (
+                <motion.div
+                  variants={itemVariants}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  <div className="flex items-center space-x-8 border border-gray-200 rounded-xl p-6 bg-gradient-to-br from-white via-red-50 to-white shadow-sm hover:shadow-md transition-shadow">
+                    
+                    {/* Profile Image */}
+                    <div className="relative w-32 h-32">
+                      <img
+                        src={FireAdmin} // Replace with actual image or placeholder
+                        alt="Profile"
+                        className="w-full h-full rounded-full object-cover border-4 border-white shadow-md"
+                      />
+                      <div className="absolute -inset-1 rounded-full bg-red-400 opacity-10 blur-lg"></div>
+                    </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Profile Information */}
-                <motion.div variants={itemVariants}>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Personal Information</h3>
-                  <div className="space-y-3 border border-gray-200 rounded-lg p-4">
-                    <div className="flex justify-between py-2 border-b border-gray-100">
-                      <span className="text-gray-600">User ID:</span>
-                      <span className="font-medium text-gray-800">{userInfo.userId || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b border-gray-100">
-                      <span className="text-gray-600">Email:</span>
-                      <span className="font-medium text-gray-800">{userInfo.sub || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between py-2">
-                      <span className="text-gray-600">Role:</span>
-                      <span className="font-medium text-gray-800">{userInfo.role || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-t border-gray-100 mt-4">
-                      <span className="text-gray-600">Full Name:</span>
-                      <span className="font-medium text-gray-800">{profileData.name || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between py-2">
-                      <span className="text-gray-600">Badge:</span>
-                      <span className="font-medium text-gray-800">{profileData.badge || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between py-2">
-                      <span className="text-gray-600">Rank:</span>
-                      <span className="font-medium text-gray-800">{profileData.rank || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between py-2">
-                      <span className="text-gray-600">Department:</span>
-                      <span className="font-medium text-gray-800">{profileData.department || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between py-2">
-                      <span className="text-gray-600">Experience:</span>
-                      <span className="font-medium text-gray-800">{profileData.experience || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between py-2">
-                      <span className="text-gray-600">Phone:</span>
-                      <span className="font-medium text-gray-800">{profileData.phone || 'N/A'}</span>
+                    {/* Profile Details */}
+                    <div className="flex-1">
+                      <dl className="divide-y divide-gray-200 text-sm text-gray-800 space-y-3">
+                        <ProfileItem icon={<Fingerprint className="text-red-600 w-4 h-4" />} label="User ID" value={profileData.id} />
+                        <ProfileItem icon={<User className="text-red-600 w-4 h-4" />} label="Full Name" value={profileData.fullName} />
+                        <ProfileItem icon={<Mail className="text-red-600 w-4 h-4" />} label="Email" value={profileData.email} />
+                        <ProfileItem icon={<Phone className="text-red-600 w-4 h-4" />} label="Phone" value={profileData.phoneNumber} />
+                        <ProfileItem icon={<IdCard className="text-red-600 w-4 h-4" />} label="Govt ID" value={profileData.governmentId} />
+                      </dl>
                     </div>
                   </div>
-                </motion.div>
 
-                {/* Performance Stats */}
-                <motion.div variants={itemVariants}>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Performance Statistics</h3>
-                  <div className="space-y-4">
-                    <div className="bg-gray-100 p-4 rounded-lg shadow-sm"> {/* Light neutral background */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-blue-700 font-medium">Emergencies Responded</span> {/* Blue text for numbers */}
-                        <span className="text-2xl font-bold text-blue-700">312</span>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">This year</p>
-                    </div>
-
-                    <div className="bg-gray-100 p-4 rounded-lg shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-green-700 font-medium">Success Rate</span>
-                        <span className="text-2xl font-bold text-green-700">96%</span>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">Resolved emergencies</p>
-                    </div>
-
-                    <div className="bg-gray-100 p-4 rounded-lg shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-yellow-700 font-medium">Response Time</span>
-                        <span className="text-2xl font-bold text-yellow-700">3.2 min</span>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">Average</p>
-                    </div>
-
-                    <div className="bg-gray-100 p-4 rounded-lg shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-red-700 font-medium">Service Hours</span>
-                        <span className="text-2xl font-bold text-red-700">2,156</span>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">This year</p>
-                    </div>
+                  {/* Edit Button */}
+                  <div className="flex justify-center mt-6">
+                    <button className="bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-all shadow-sm">
+                      Edit Profile
+                    </button>
                   </div>
                 </motion.div>
-              </div>
               )}
-
-              {/* Recent Achievements */}
-              <motion.div className="mt-10" variants={itemVariants}>
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Recent Achievements</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <motion.div
-                    className="bg-white p-5 rounded-lg shadow-md flex flex-col items-center text-center border border-gray-200" // Minimal card style
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.98 }}
-                    variants={itemVariants}
-                  >
-                    <div className="text-4xl mb-3 text-blue-500">🏆</div> {/* Icon with accent color */}
-                    <h4 className="font-semibold text-xl text-gray-800">Firefighter of the Year</h4>
-                    <p className="text-sm text-gray-600 opacity-90">2024</p>
-                  </motion.div>
-                  <motion.div
-                    className="bg-white p-5 rounded-lg shadow-md flex flex-col items-center text-center border border-gray-200"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.98 }}
-                    variants={itemVariants}
-                  >
-                    <div className="text-4xl mb-3 text-green-500">⭐</div>
-                    <h4 className="font-semibold text-xl text-gray-800">Bravery Award</h4>
-                    <p className="text-sm text-gray-600 opacity-90">Rescue Operations</p>
-                  </motion.div>
-                  <motion.div
-                    className="bg-white p-5 rounded-lg shadow-md flex flex-col items-center text-center border border-gray-200"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.98 }}
-                    variants={itemVariants}
-                  >
-                    <div className="text-4xl mb-3 text-gray-600">🎯</div>
-                    <h4 className="font-semibold text-xl text-gray-800">Perfect Attendance</h4>
-                    <p className="text-sm text-gray-600 opacity-90">12 months</p>
-                  </motion.div>
-                </div>
-              </motion.div>
             </div>
           </motion.div>
         )}
+
+        {activeTab === 'register' && (
+                  <motion.div className="max-w-2xl mx-auto" variants={containerVariants} initial="hidden" animate="visible">
+                    <div className="bg-white p-8 rounded-lg shadow-xl border border-gray-200">
+                      <div className="text-center mb-8">
+                        <SectionHeader icon={<PlusCircleIcon />} title="Register Driver" />
+                        <p className="text-gray-600">Add a new driver to the emergency response system</p>
+                      </div>
+        
+                      <form onSubmit={handleFireDriverSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <motion.div variants={itemVariants}>
+                            <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                            <div className="relative">
+                              <input
+                                id="fullName"
+                                name="fullName"
+                                value={form.fullName}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                required
+                                className={`w-full px-4 py-3 pl-10 border ${formErrors.fullName ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
+                                placeholder="Enter full name"
+                                maxLength="100"
+                              />
+                              <UserCircleIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                            </div>
+                            {formErrors.fullName && <p className="mt-1 text-sm text-red-600">{formErrors.fullName}</p>}
+                          </motion.div>
+                          <motion.div variants={itemVariants}>
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                            <div className="relative">
+                              <input
+                                id="email"
+                                name="email"
+                                value={form.email}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                type="email"
+                                required
+                                className={`w-full px-4 py-3 pl-10 border ${formErrors.email ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
+                                placeholder="Enter email address"
+                                maxLength="100"
+                              />
+                              <EnvelopeIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                            </div>
+                            {formErrors.email && <p className="mt-1 text-sm text-red-600">{formErrors.email}</p>}
+                          </motion.div>
+                        </div>
+        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <motion.div variants={itemVariants}>
+                            <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                            <div className="relative">
+                              <input
+                                id="phoneNumber"
+                                name="phoneNumber"
+                                value={form.phoneNumber}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                required
+                                className={`w-full px-4 py-3 pl-10 border ${formErrors.phoneNumber ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
+                                placeholder="e.g., 9876543210"
+                                maxLength="10"
+                              />
+                              <PhoneIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                            </div>
+                            {formErrors.phoneNumber && <p className="mt-1 text-sm text-red-600">{formErrors.phoneNumber}</p>}
+                          </motion.div>
+                          <motion.div variants={itemVariants}>
+                            <label htmlFor="governmentId" className="block text-sm font-medium text-gray-700 mb-2">Government ID (PAN)</label>
+                            <div className="relative">
+                              <input
+                                id="governmentId"
+                                name="governmentId"
+                                value={form.governmentId}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                required
+                                className={`w-full px-4 py-3 pl-10 border ${formErrors.governmentId ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
+                                placeholder="e.g., ABCDE1234F"
+                                maxLength="10"
+                              />
+                              <IdentificationIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                            </div>
+                            {formErrors.governmentId && <p className="mt-1 text-sm text-red-600">{formErrors.governmentId}</p>}
+                          </motion.div>
+                        </div>
+        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <motion.div variants={itemVariants}>
+                            <label htmlFor="licenseNumber" className="block text-sm font-medium text-gray-700 mb-2">License Number</label>
+                            <div className="relative">
+                              <input
+                                id="licenseNumber"
+                                name="licenseNumber"
+                                value={form.licenseNumber}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                required
+                                className={`w-full px-4 py-3 pl-10 border ${formErrors.licenseNumber ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
+                                placeholder="e.g., MH-AMBU-0234"
+                                maxLength="20"
+                              />
+                              <IdentificationIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                            </div>
+                            {formErrors.licenseNumber && <p className="mt-1 text-sm text-red-600">{formErrors.licenseNumber}</p>}
+                          </motion.div>
+                          <motion.div variants={itemVariants}>
+                            <label htmlFor="vehicleRegNumber" className="block text-sm font-medium text-gray-700 mb-2">Vehicle Registration</label>
+                            <div className="relative">
+                              <input
+                                id="vehicleRegNumber"
+                                name="vehicleRegNumber"
+                                value={form.vehicleRegNumber}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                required
+                                className={`w-full px-4 py-3 pl-10 border ${formErrors.vehicleRegNumber ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
+                                placeholder="e.g., MH15BA3254"
+                                maxLength="10"
+                              />
+                              <TruckIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                            </div>
+                            {formErrors.vehicleRegNumber && <p className="mt-1 text-sm text-red-600">{formErrors.vehicleRegNumber}</p>}
+                          </motion.div>
+                        </div>
+        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <motion.div variants={itemVariants}>
+                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                            <div className="relative">
+                              <input
+                                id="password"
+                                name="password"
+                                value={form.password}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                type="password"
+                                required
+                                className={`w-full px-4 py-3 pl-10 border ${formErrors.password ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
+                                placeholder="Enter password"
+                                minLength="6"
+                              />
+                              <KeyIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                            </div>
+                            {formErrors.password && <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>}
+                          </motion.div>
+                          <motion.div variants={itemVariants}>
+                            <label htmlFor="hospitalID" className="block text-sm font-medium text-gray-700 mb-2">Hospital ID</label>
+                            <div className="relative">
+                              <input
+                                id="hospitalID"
+                                name="hospitalID"
+                                value={form.hospitalID}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                type="number"
+                                required
+                                className={`w-full px-4 py-3 pl-10 border ${form.ErrorshospitalID ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
+                                placeholder="Enter Hospital ID"
+                                min="1"
+                              />
+                              <BuildingOfficeIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                            </div>
+                            {form.ErrorshospitalID && <p className="mt-1 text-sm text-red-600">{form.ErrorshospitalID}</p>}
+                          </motion.div>
+                        </div>
+        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <motion.div variants={itemVariants}>
+                            <label htmlFor="securityQuestion" className="block text-sm font-medium text-gray-700 mb-2">Security Question</label>
+                            <div className="relative">
+                              <select
+                                id="securityQuestion"
+                                name="securityQuestion"
+                                value={form.securityQuestion}
+                                onChange={handleChange}
+                                className={`w-full px-4 py-3 pl-10 border ${formErrors.securityQuestion ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
+                              >
+                                <option value="PET_NAME">What is your pet's name?</option>
+                                <option value="BIRTH_CITY">In which city were you born?</option>
+                                <option value="FAVORITE_TEACHER">Who was your favorite teacher?</option>
+                                <option value="MOTHER_MAIDEN_NAME">What is your mother's maiden name?</option>
+                              </select>
+                              <KeyIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                            </div>
+                          </motion.div>
+                          <motion.div variants={itemVariants}>
+                            <label htmlFor="securityAnswer" className="block text-sm font-medium text-gray-700 mb-2">Security Answer</label>
+                            <div className="relative">
+                              <input
+                                id="securityAnswer"
+                                name="securityAnswer"
+                                value={form.securityAnswer}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                required
+                                className={`w-full px-4 py-3 pl-10 border ${formErrors.securityAnswer ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
+                                placeholder="Enter security answer"
+                              />
+                              <KeyIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                            </div>
+                            {formErrors.securityAnswer && <p className="mt-1 text-sm text-red-600">{formErrors.securityAnswer}</p>}
+                          </motion.div>
+                        </div>
+        
+                        <motion.button
+                          type="submit"
+                          disabled={loading}
+                          className="w-full inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors"
+                          variants={itemVariants}
+                        >
+                          {loading ? (
+                            <>
+                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Registering...
+                            </>
+                          ) : (
+                            <>
+                              <PlusCircleIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+                              Register Driver
+                            </>
+                          )}
+                        </motion.button>
+        
+                        {message && (
+                          <motion.div
+                            className={`mt-4 p-3 rounded-md text-sm border ${
+                              message.includes('success')
+                                ? 'bg-green-50 text-green-700 border-green-200'
+                                : 'bg-red-50 text-red-700 border-red-200'
+                            }`}
+                            role="alert"
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                          >
+                            {message}
+                          </motion.div>
+                        )}
+                      </form>
+                    </div>
+                  </motion.div>
+                )}
       </motion.div>
     </div>
   );
