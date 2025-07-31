@@ -1,13 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion'; // Import motion from framer-motion
+import axios from 'axios';
+
+import { CheckCircleIcon } from '@heroicons/react/24/outline';
+import { AnimatePresence} from "framer-motion";
+
 import {
   HomeIcon,
+  ArrowRightOnRectangleIcon
+} from '@heroicons/react/24/solid';
+
+import {
+  UserIcon,
+  GlobeAltIcon,
   UserGroupIcon,
   TruckIcon,
-  ExclamationCircleIcon,
   TrophyIcon,
+  ExclamationCircleIcon,
   UserCircleIcon,
+  Bars3BottomLeftIcon,
   PlusCircleIcon,
   MapPinIcon,
   ClockIcon,
@@ -17,11 +29,16 @@ import {
   PhoneIcon,
   KeyIcon,
   CalendarDaysIcon,
-  Bars3BottomLeftIcon,
   CurrencyDollarIcon,
   MagnifyingGlassIcon,
-  ClipboardDocumentCheckIcon,
+  ClipboardDocumentCheckIcon
 } from '@heroicons/react/24/outline';
+
+import { User, Phone, Mail, Fingerprint, IdCard } from 'lucide-react';
+import { motion } from 'framer-motion';
+import reactLogo from './../../assets/react-logo.png';
+import AmbulanceAdmin from './../../assets/AmbulanceAdmin.avif';
+import { toast } from 'react-toastify';
 
 // Add a simple JWT decode function (if jwt-decode is not available)
 function decodeJWT(token) {
@@ -63,6 +80,12 @@ const headerVariants = {
   hidden: { opacity: 0, x: -50 },
   visible: { opacity: 1, x: 0, transition: { duration: 0.6, ease: "easeOut" } },
 };
+const InfoLine = ({ label, value }) => (
+  <div>
+    <span className="font-medium">{label}:</span>{' '}
+    <span className="text-gray-700">{value}</span>
+  </div>
+);
 
 // Variants for Navbar Icons
 const navIconVariants = {
@@ -86,18 +109,7 @@ function SectionHeader({ icon, title }) {
   );
 }
 
-const ReactLogo = () => (
-  <svg width="36" height="36" viewBox="0 0 841.9 595.3" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <g>
-      <circle cx="420.9" cy="296.5" r="45.7" fill="#61DAFB"/>
-      <g stroke="#61DAFB" strokeWidth="30" fill="none">
-        <ellipse rx="218.7" ry="545.9" transform="rotate(60 420.9 296.5)"/>
-        <ellipse rx="218.7" ry="545.9" transform="rotate(120 420.9 296.5)"/>
-        <ellipse rx="218.7" ry="545.9" transform="rotate(180 420.9 296.5)"/>
-      </g>
-    </g>
-  </svg>
-);
+
 
 export default function AmbulanceDashboard() {
   const navigate = useNavigate();
@@ -112,7 +124,7 @@ export default function AmbulanceDashboard() {
     vehicleRegNumber: '',
     securityQuestion: 'PET_NAME',
     securityAnswer: '',
-    fireStationId: '',
+    hospitalID: '',
   });
   const [locationForm, setLocationForm] = useState({
     ambulanceId: '',
@@ -148,17 +160,24 @@ export default function AmbulanceDashboard() {
   const [dashboardStats, setDashboardStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState('');
+  const [selectedDriver, setSelectedDriver] = useState(null);
+  const [selectedDriverLoading, setSelectedDriverLoading] = useState(false);
+  const [selectedDriverError, setSelectedDriverError] = useState('');
+  const [emergencyAddresses, setEmergencyAddresses] = useState({});
+  const [hoveredCoords, setHoveredCoords] = useState(null);
+  const [hoveredEmergencyId, setHoveredEmergencyId] = useState(null);
+const hoverTimeout = useRef(null);
   const [profileData, setProfileData] = useState({
-    name: 'Ambulance Driver Name',
-    badge: 'A-2024-001',
-    rank: 'Senior Driver',
-    department: 'Emergency Response',
-    experience: '10 years',
-    email: 'driver@ambulance.gov',
-    phone: '+1 (555) 123-4567'
-  });
+  id: '',
+  fullName: '',
+  email: '',
+  phoneNumber: '',
+  governmentId: ''
+});
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState(null);
+  const [resolvedAddress, setResolvedAddress] = useState('');
+
 
   // New state for individual input errors
   const [formErrors, setFormErrors] = useState({
@@ -170,7 +189,7 @@ export default function AmbulanceDashboard() {
     licenseNumber: '',
     vehicleRegNumber: '',
     securityAnswer: '',
-    fireStationId: '',
+  hospitalID: '',
   });
   const [locationFormErrors, setLocationFormErrors] = useState({
     ambulanceId: '',
@@ -182,7 +201,7 @@ export default function AmbulanceDashboard() {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const phoneRegex = /^[6-9]\d{9}$/;
   const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/; // PAN format
-  const licenseRegex = /^[A-Z]{2}-[A-Z]+-\d{4}$/i; // Format: STATE-TYPE-NUMBER (e.g., MH-FIRE-0234)
+  const licenseRegex = /^[A-Z]{2}-[A-Z]+-\d{4}$/i; // Format: STATE-TYPE-NUMBER (e.g., MH-AMBU-0234)
   const vehicleRegRegex = /^[A-Z]{2}\d{2}[A-Z]{2}\d{4}$/i; // Format: STATE + 2 digits + 2 letters + 4 digits (e.g., MH15BA3254)
 
   useEffect(() => {
@@ -210,7 +229,38 @@ export default function AmbulanceDashboard() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'drivers' || activeTab === 'rankings') {
+  if (activeTab === 'drivers') {
+    handleFetchAllDrivers();
+  }
+}, [activeTab]);
+
+useEffect(() => {
+  const controller = new AbortController();
+  const fetchAddresses = async () => {
+    const addressMap = {};
+    await Promise.all(
+      recentEmergencies.map(async (em) => {
+        const key = em.booking_id;
+        try {
+          const address = await getAddressFromCoords(em.pickup_latitude, em.pickup_longitude);
+          addressMap[key] = address;
+        } catch (err) {
+          addressMap[key] = 'Unable to resolve';
+        }
+      })
+    );
+    setEmergencyAddresses(addressMap);
+  };
+
+  if (recentEmergencies.length > 0) {
+    const timeout = setTimeout(fetchAddresses, 500); // debounce by 500ms
+    return () => clearTimeout(timeout);
+  }
+}, [recentEmergencies]);
+
+
+  useEffect(() => {
+    if (activeTab === 'drivers' ) {
       setAmbulancesLoading(true);
       setAmbulancesError('');
       const jwt = localStorage.getItem('jwt');
@@ -272,12 +322,37 @@ export default function AmbulanceDashboard() {
     }
   }, [activeTab]);
 
+  const [profileName, setProfileName] = useState(''); // Add this state
+
+  useEffect(() => {
+    // Fetch profile name from new endpoint
+    const jwt = localStorage.getItem('jwt');
+    if (!jwt) return;
+    fetch('http://localhost:8080/api/user/me', {
+      headers: { 'Authorization': `Bearer ${jwt}` }
+    })
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setProfileName(data.fullName))
+      .catch(() => setProfileName('A'));
+  }, []);
+
+
+  const ProfileItem = ({ icon, label, value }) => (
+  <div className="flex items-center justify-between pt-2">
+    <div className="flex items-center gap-2 text-gray-500">
+      {icon}
+      <dt className="font-medium">{label}</dt>
+    </div>
+    <dd className="text-gray-900 font-semibold">{value || 'N/A'}</dd>
+  </div>
+);
+
+
   // Fetch profile data when profile tab is active
   useEffect(() => {
-    if (activeTab === 'profile') {
-      fetchAmbulanceDriverProfile();
-    }
-  }, [activeTab]);
+      fetchAdminProfile();
+    
+  }, []);
 
   const validateField = (name, value) => {
     let error = '';
@@ -304,15 +379,15 @@ export default function AmbulanceDashboard() {
         break;
       case 'licenseNumber':
         if (!value.trim()) error = 'License Number is required.';
-        else if (!licenseRegex.test(value)) error = 'Enter valid License (e.g., MH-FIRE-0234).';
+        else if (!licenseRegex.test(value)) error = 'Enter valid License (e.g., MH-AMBU-0234).';
         break;
       case 'vehicleRegNumber':
         if (!value.trim()) error = 'Vehicle Registration is required.';
         else if (!vehicleRegRegex.test(value)) error = 'Enter valid Vehicle Reg (e.g., MH15BA3254).';
         break;
-      case 'fireStationId':
-        if (!value) error = 'Fire Station ID is required.'; // Allow 0 for empty field, validate onBlur/submit
-        else if (isNaN(Number(value)) || Number(value) <= 0) error = 'Fire Station ID must be a positive number.';
+      case 'hospitalID':
+        if (!value) error = 'hospital Station ID is required.'; // Allow 0 for empty field, validate onBlur/submit
+        else if (isNaN(Number(value)) || Number(value) <= 0) error = 'hospital Station ID must be a positive number.';
         break;
       case 'securityAnswer':
         if (!value.trim()) error = 'Security Answer is required.';
@@ -334,6 +409,30 @@ export default function AmbulanceDashboard() {
   const handleBlur = (e) => {
     const { name, value } = e.target;
     validateField(name, value);
+  };
+
+  // Function to fetch driver details
+  const handleDriverCardClick = async (driverId) => {
+    setSelectedDriverLoading(true);
+    setSelectedDriverError('');
+    setSelectedDriver(null);
+    try {
+      const jwt = localStorage.getItem('jwt');
+      const res = await fetch(`http://localhost:8080/ambulance/location/${driverId}`, {
+        headers: { 'Authorization': `Bearer ${jwt}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedDriver(data);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setSelectedDriverError(data.message || 'Failed to fetch driver details.');
+      }
+    } catch (err) {
+      setSelectedDriverError('Network error. Please check your connection.');
+    } finally {
+      setSelectedDriverLoading(false);
+    }
   };
 
   const validateLocationField = (name, value) => {
@@ -373,11 +472,11 @@ export default function AmbulanceDashboard() {
   const validateAllRegistrationFields = () => {
     let isValid = true;
     for (const key in form) {
-      if (key !== 'fireStationId' && key !== 'securityQuestion' && !form[key].trim()) { // Check for empty strings for text fields
+      if (key !== 'hospitalID' && key !== 'securityQuestion' && !form[key].trim()) { // Check for empty strings for text fields
           setFormErrors(prev => ({ ...prev, [key]: `${key.replace(/([A-Z])/g, ' $1').trim()} is required.` }));
           isValid = false;
-      } else if (key === 'fireStationId' && (isNaN(Number(form[key])) || Number(form[key]) <= 0)) {
-          setFormErrors(prev => ({ ...prev, [key]: 'Fire Station ID must be a positive number.' }));
+      } else if (key === 'hospitalID' && (isNaN(Number(form[key])) || Number(form[key]) <= 0)) {
+          setFormErrors(prev => ({ ...prev, [key]: 'Hospital ID must be a positive number.' }));
           isValid = false;
       } else if (!validateField(key, form[key])) { // Run specific regex/length validation
         isValid = false;
@@ -395,8 +494,8 @@ export default function AmbulanceDashboard() {
     }
     setLoading(true);
     try {
-      const body = { ...form, fireStationId: Number(form.fireStationId) };
-      const res = await fetch('http://localhost:8080/auth/register', {
+      const body = { ...form, hospitalID :Number(form.hospitalID) };
+      const res = await fetch('http://localhost:8080/auth/register/ambulance-driver', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -619,30 +718,29 @@ export default function AmbulanceDashboard() {
     }
   };
 
-  const fetchAmbulanceDriverProfile = async () => {
+  const fetchAdminProfile = async () => {
     setProfileLoading(true);
     setProfileError(null);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8080/ambulance-driver/v1/me', {
+      const token = localStorage.getItem('jwt');
+      const response = await fetch('http://localhost:8080/api/user/me', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
       });
 
       if (response.ok) {
         const data = await response.json();
+        console.log(data);
         setProfileData({
-          name: data.name || 'Ambulance Driver Name',
-          badge: data.badgeNumber || 'N/A',
-          rank: data.rank || 'N/A',
-          department: data.department || 'N/A',
-          experience: data.experience || 'N/A',
-          email: data.email || 'N/A',
-          phone: data.phone || 'N/A'
-        });
+        id: data.id || 'N/A',
+        fullName: data.fullName || 'N/A',
+        email: data.email || 'N/A',
+        phoneNumber: data.phoneNumber || 'N/A',
+        governmentId: data.governmentId || 'N/A',
+      });
       } else {
         const errorData = await response.json();
         setProfileError(errorData.message || 'Failed to fetch profile data');
@@ -720,7 +818,7 @@ export default function AmbulanceDashboard() {
   const userInfo = decodeJWT(jwt);
 
   return (
-    <div className="min-h-screen bg-gray-50 font-inter text-gray-800">
+    <div className="min-h-screen bg-[#E8E6E0] font-inter text-gray-800">
       {/* Google Fonts Preconnect and Import (Add this to your public/index.html or a global CSS file) */}
       {/* For demonstration, added directly here. In a real project, use <link> in HTML or @import in global CSS. */}
       <style>
@@ -732,82 +830,84 @@ export default function AmbulanceDashboard() {
         `}
       </style>
 
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <ReactLogo />
-              <div>
-                <h1 className="text-3xl font-bold text-gray-800">Ambulance Admin Dashboard</h1>
-                <p className="text-gray-500">Emergency Medical Services Management</p>
-              </div>
+      <div className=" border-b border-gray-200">
+        {/* Header Top Bar */}
+        <div className=" max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+          {/* Left - Logo */}
+          <div className=" flex items-center gap-4">
+            <img
+              src={reactLogo}
+              alt="Logo"
+              className="h-14 w-14 object-contain rounded-xl bg-white p-2 shadow-sm"
+            />
+            <div>
+              <h1 className="text-xl font-semibold text-gray-800">Ambulance Admin Dashboard</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm text-gray-600">Ambulance Administrator</p>
-                <p className="text-xs text-gray-500">Last updated: {new Date().toLocaleTimeString()}</p>
-              </div>
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={() => navigate('/')}
-                  className="text-gray-600 hover:text-gray-800 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
-                >
-                  Home
-                </button>
-                <button
-                  onClick={() => {
-                    localStorage.removeItem('jwt');
-                    navigate('/login');
-                  }}
-                  className="text-gray-600 hover:text-gray-800 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
-                >
-                  Logout
-                </button>
-                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold hover:bg-blue-600 transition">
-                  <TruckIcon className="h-6 w-6" />
-                </div>
-              </div>
+          </div>
+
+          {/* Right - User Info & Actions */}
+          <div className="flex items-center gap-6">
+            {/* User Info */}
+            <div className="text-right">
+              <p className="text-sm text-gray-600">Wecome {profileData.fullName}</p>
+              <p className="text-xs text-gray-400">Updated: {new Date().toLocaleTimeString()}</p>
+            </div>
+
+            {/* Profile Image */}
+            <img
+              src={AmbulanceAdmin}
+              alt="Admin"
+              className="h-10 w-10 rounded-full object-cover border-2 border-white shadow"
+            />
+
+            {/* Icon Actions */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/')}
+                title="Home"
+                className="text-gray-600 hover:text-green-600 transition"
+              >
+                <HomeIcon className="h-6 w-6" />
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('jwt');
+                  navigate('/login');
+                }}
+                title="Logout"
+                className="text-red-600 hover:text-red-800 transition"
+              >
+                <ArrowRightOnRectangleIcon className="h-6 w-6" />
+              </button>
             </div>
           </div>
         </div>
       </div>
-      {/* Navigation Tabs */}
-      <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4">
-          <nav className="flex space-x-8">
-            {[
-              { id: 'overview', name: 'Overview', icon: <Bars3BottomLeftIcon className="h-5 w-5" /> },
-              { id: 'drivers', name: 'Drivers', icon: <UserGroupIcon className="h-5 w-5" /> },
-              { id: 'vehicles', name: 'Vehicles', icon: <TruckIcon className="h-5 w-5" /> },
-              { id: 'emergencies', name: 'Emergencies', icon: <ExclamationCircleIcon className="h-5 w-5" /> },
-              { id: 'rankings', name: 'Rankings', icon: <TrophyIcon className="h-5 w-5" /> },
-              { id: 'profile', name: 'Profile', icon: <UserCircleIcon className="h-5 w-5" /> },
-              { id: 'register', name: 'Register', icon: <PlusCircleIcon className="h-5 w-5" /> }
-            ].map((tab) => (
-              <motion.button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 flex items-center group
-                  ${activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-blue-500 hover:border-blue-300'
-                  }`}
-                initial="rest"
-                whileHover="hover"
-                animate={activeTab === tab.id ? "active" : "rest"}
-              >
-                <motion.span
-                  className="mr-2 inline-block align-middle"
-                  variants={navIconVariants}
-                >
-                  {tab.icon}
-                </motion.span>
-                {tab.name}
-              </motion.button>
-            ))}
-          </nav>
-        </div>
+
+      {/* Navbar - Detached capsule strip */}
+      <div className="w-full flex justify-center my-6">
+        <nav className="bg-[#f9f9f7] border border-gray-200 rounded-full shadow-md px-4 py-2 flex space-x-4 overflow-x-auto max-w-5xl">
+          {[
+            { id: 'overview', name: 'Overview', icon: <Bars3BottomLeftIcon className="h-5 w-5" /> },
+            { id: 'drivers', name: 'Drivers', icon: <UserGroupIcon className="h-5 w-5" /> },
+            { id: 'vehicles', name: 'Vehicles', icon: <TruckIcon className="h-5 w-5" /> },
+            { id: 'emergencies', name: 'Emergencies', icon: <ExclamationCircleIcon className="h-5 w-5" /> },
+            { id: 'profile', name: 'Profile', icon: <UserCircleIcon className="h-5 w-5" /> },
+            { id: 'register', name: 'Register', icon: <PlusCircleIcon className="h-5 w-5" /> },
+          ].map((tab) => (
+            <motion.button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
+                ${activeTab === tab.id
+                  ? 'bg-green-100 text-green-700 border-green-200'
+                  : 'text-gray-600 border-transparent hover:bg-gray-100 hover:text-green-600'}`}
+            >
+              {tab.icon}
+              {tab.name}
+            </motion.button>
+          ))}
+        </nav>
       </div>
       {/* Main Content */}
       <motion.div
@@ -867,315 +967,532 @@ export default function AmbulanceDashboard() {
               </div>
             </div>
 
-            {/* Statistics */}
-            <div>
-              <SectionHeader icon={<CurrencyDollarIcon />} title="Dashboard Statistics" />
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {statsLoading ? (
-                  <motion.div className="col-span-4 text-center py-8 text-blue-600 font-semibold" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>Loading statistics...</motion.div>
-                ) : statsError ? (
-                  <motion.div className="col-span-4 text-center py-8 text-red-600 font-semibold" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>{statsError}</motion.div>
-                ) : dashboardStats ? (
-                  <>
+          
+          {/* 🚑 Dashboard Statistics */}
+            <div className="mt-10">
+              <SectionHeader icon={<CurrencyDollarIcon className="text-primary" />} title="Dashboard Statistics" />
+
+              {statsLoading ? (
+                <motion.div
+                  className="text-center py-6 text-blue-600 font-medium"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  Loading statistics...
+                </motion.div>
+              ) : statsError ? (
+                <motion.div
+                  className="text-center py-6 text-red-600 font-medium"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  {statsError}
+                </motion.div>
+              ) : dashboardStats ? (
+                <>
+                  {/* 📦 Stats Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     <StatCard
                       title="Total Ambulances"
                       value={dashboardStats.total_ambulances}
-                      subtitle="Active ambulances"
-                      bgColorClass="bg-white"
-                      icon={<TruckIcon />}
+                      subtitle="Active fleet"
+                      icon={<TruckIcon className="h-6 w-6 text-primary" />}
+                      bgColorClass="bg-gradient-to-tr from-green-50 to-white"
                     />
                     <StatCard
-                      title="Available Ambulances"
+                      title="Available"
                       value={dashboardStats.available_ambulances}
-                      subtitle="Ready for service"
-                      bgColorClass="bg-white"
-                      icon={<UserGroupIcon />}
+                      subtitle="Ready now"
+                      icon={<UserGroupIcon className="h-6 w-6 text-green-600" />}
+                      bgColorClass="bg-gradient-to-tr from-emerald-50 to-white"
                     />
                     <StatCard
                       title="Total Bookings"
                       value={dashboardStats.ambulance_bookings}
-                      subtitle="Today's calls"
-                      bgColorClass="bg-white"
-                      icon={<ExclamationCircleIcon />}
+                      subtitle="Today"
+                      icon={<ExclamationCircleIcon className="h-6 w-6 text-red-500" />}
+                      bgColorClass="bg-gradient-to-tr from-red-50 to-white"
                     />
                     <StatCard
-                      title="Avg Completion Time"
+                      title="Avg Time"
                       value={`${dashboardStats.average_completion_time_minutes} min`}
-                      subtitle="Emergency response"
-                      bgColorClass="bg-white"
-                      icon={<ClockIcon />}
+                      subtitle="Completion"
+                      icon={<ClockIcon className="h-6 w-6 text-gray-700" />}
+                      bgColorClass="bg-gradient-to-tr from-gray-100 to-white"
                     />
-                  </>
-                ) : null}
-              </div>
+                  </div>
+                </>
+              ) : null}
             </div>
+
 
             {/* Recent Emergencies */}
-            <div>
-              <SectionHeader icon={<ExclamationCircleIcon />} title="Recent Emergencies" />
-              {emergenciesLoading ? (
-                <motion.div className="text-center py-8 text-blue-600 font-semibold" variants={itemVariants}>Loading emergencies...</motion.div>
-              ) : emergenciesError ? (
-                <motion.div className="text-center py-8 text-red-600 font-semibold" variants={itemVariants}>{emergenciesError}</motion.div>
-              ) : recentEmergencies.length === 0 ? (
-                <motion.div className="text-center py-8 text-gray-500" variants={itemVariants}>No recent emergencies found.</motion.div>
-              ) : (
-                <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <motion.table className="min-w-full divide-y divide-gray-200" initial="hidden" animate="visible" variants={containerVariants}>
-                      <motion.thead className="bg-gray-50" variants={itemVariants}>
-                        <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">ID</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Issue</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Created At</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Victim Phone</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Pickup Lat</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Pickup Lng</th>
-                        </tr>
-                      </motion.thead>
-                      <motion.tbody className="bg-white divide-y divide-gray-200">
-                        {recentEmergencies.map((em, index) => (
-                          <motion.tr key={em.booking_id} className="hover:bg-gray-50" variants={itemVariants}>
-                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{em.booking_id}</td>
-                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{em.issue_type}</td>
-                            <td className="px-4 py-2 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${em.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{em.status}</span>
-                            </td>
-                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{new Date(em.created_at).toLocaleString()}</td>
-                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{em.victim_phone_number}</td>
-                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{em.pickup_latitude}</td>
-                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{em.pickup_longitude}</td>
-                          </motion.tr>
-                        ))}
-                      </motion.tbody>
-                    </motion.table>
-                  </div>
-                </div>
-              )}
-            </div>
+              <div className="mt-12 space-y-10">
+                <SectionHeader
+                  icon={<ExclamationCircleIcon className="h-6 w-6 text-primary" />}
+                  title="Recent Emergencies"
+                />
+
+                {emergenciesLoading ? (
+                  <motion.div className="text-center py-6 text-primary font-medium" variants={itemVariants}>
+                    Loading emergencies...
+                  </motion.div>
+                ) : emergenciesError ? (
+                  <motion.div className="text-center py-6 text-red-600 font-medium" variants={itemVariants}>
+                    {emergenciesError}
+                  </motion.div>
+                ) : recentEmergencies.length === 0 ? (
+                  <motion.div className="text-center py-6 text-gray-400" variants={itemVariants}>
+                    No recent emergencies found.
+                  </motion.div>
+                ) : (
+                  <>
+                    {/* 🟡 Pending Emergencies */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-yellow-700 mb-3 flex items-center gap-2">
+                        <ExclamationCircleIcon className="h-5 w-5" />
+                        Pending Emergencies
+                      </h3>
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {recentEmergencies
+                          .filter((em) => em.status !== 'COMPLETED')
+                          .map((em) => (
+                            <motion.div
+                              key={em.booking_id}
+                              className="bg-white border border-yellow-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition"
+                              variants={itemVariants}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-semibold text-gray-700">ID: {em.booking_id}</span>
+                                <span className="text-xs font-medium px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                                  {em.status}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-600 mb-1">
+                                <span className="font-medium text-gray-800">Issue:</span> {em.issue_type}
+                              </div>
+                              <div className="text-sm text-gray-600 mb-1">
+                                <span className="font-medium text-gray-800">Victim Phone:</span>{' '}
+                                {em.victim_phone_number}
+                              </div>
+                              <div className="text-sm text-gray-600 mb-1">
+                                <span className="font-medium text-gray-800">Pickup Location:</span>{' '}
+                                {em.pickup_latitude}, {em.pickup_longitude}
+                              </div>
+                              <div className="text-sm text-gray-500 mt-2">
+                                <ClockIcon className="inline h-4 w-4 mr-1 text-gray-400" />
+                                {new Date(em.created_at).toLocaleString()}
+                              </div>
+                            </motion.div>
+                          ))}
+                      </div>
+                    </div>
+
+                    {/* ✅ Completed Emergencies */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-green-700 mb-3 flex items-center gap-2">
+                        <CheckCircleIcon className="h-5 w-5" />
+                        Completed Emergencies
+                      </h3>
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {recentEmergencies
+                          .filter((em) => em.status === 'COMPLETED')
+                          .map((em) => (
+                            <motion.div
+                              key={em.booking_id}
+                              className="bg-white border border-green-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition"
+                              variants={itemVariants}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-semibold text-gray-700">ID: {em.booking_id}</span>
+                                <span className="text-xs font-medium px-2 py-1 rounded-full bg-green-100 text-green-700">
+                                  {em.status}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-600 mb-1">
+                                <span className="font-medium text-gray-800">Issue:</span> {em.issue_type}
+                              </div>
+                              <div className="text-sm text-gray-600 mb-1">
+                                <span className="font-medium text-gray-800">Victim Phone:</span>{' '}
+                                {em.victim_phone_number}
+                              </div>
+                              <div className="text-sm text-gray-600 mb-1">
+                                <span className="font-medium text-gray-800">Pickup Location:</span>{' '}
+                                {em.pickup_latitude}, {em.pickup_longitude}
+                              </div>
+                              <div className="text-sm text-gray-500 mt-2">
+                                <ClockIcon className="inline h-4 w-4 mr-1 text-gray-400" />
+                                {new Date(em.created_at).toLocaleString()}
+                              </div>
+                            </motion.div>
+                          ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
           </motion.div>
         )}
 
+        {/* Ambulance Drivers Section */}
         {activeTab === 'drivers' && (
-          <motion.div className="bg-white rounded-lg shadow-md p-8 border border-gray-200" variants={containerVariants} initial="hidden" animate="visible">
+          <motion.div
+            className="bg-white rounded-xl shadow-md p-6 border border-gray-200"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
             <SectionHeader icon={<UserGroupIcon />} title="Ambulance Drivers" />
-            <motion.div className="mb-6 flex flex-col md:flex-row md:items-center gap-4" variants={itemVariants}>
-              <button
-                type="button"
-                onClick={handleFetchAllDrivers}
-                disabled={allDriversLoading}
-                className="inline-flex items-center px-5 py-2.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
-              >
-                {allDriversLoading ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Fetching...
-                  </>
-                ) : (
-                  <>
-                    <MagnifyingGlassIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-                    Get All Drivers
-                  </>
-                )}
-              </button>
-              {allDriversError && (
-                <motion.div className="p-3 rounded-md bg-red-50 text-red-700 text-sm border border-red-200" variants={itemVariants}>{allDriversError}</motion.div>
-              )}
-            </motion.div>
-            <div className="overflow-x-auto">
-              <motion.table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-lg" initial="hidden" animate="visible" variants={containerVariants}>
-                <motion.thead className="bg-gray-50" variants={itemVariants}>
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Driver</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">License</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Vehicle</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Phone</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Latitude</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Longitude</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Last Updated</th>
-                  </tr>
-                </motion.thead>
-                <motion.tbody className="bg-white divide-y divide-gray-200">
-                  {allDriversLoading ? (
-                    <motion.tr variants={itemVariants}>
-                      <td colSpan="8" className="text-center py-4 text-blue-600">Loading drivers...</td>
-                    </motion.tr>
-                  ) : allDrivers.length === 0 ? (
-                    <motion.tr variants={itemVariants}>
-                      <td colSpan="8" className="text-center py-4 text-gray-500">No drivers found. Click "Get All Drivers" to fetch.</td>
-                    </motion.tr>
-                  ) : (
-                    allDrivers.map((driver) => (
-                      <motion.tr key={driver.id} className="hover:bg-gray-50" variants={itemVariants}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{driver.driverName || 'N/A'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{driver.licenseNumber || 'N/A'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{driver.vehicleRegNumber || 'N/A'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${driver.status === 'AVAILABLE' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{driver.status}</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{driver.driverPhone || 'N/A'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{driver.latitude?.toFixed(4) || 'N/A'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{driver.longitude?.toFixed(4) || 'N/A'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{driver.lastUpdated ? new Date(driver.lastUpdated).toLocaleString() : 'N/A'}</td>
-                      </motion.tr>
-                    ))
-                  )}
-                </motion.tbody>
-              </motion.table>
-            </div>
+
+            {allDriversError && (
+              <motion.div className="mb-4 p-3 rounded-md bg-red-50 text-red-700 text-sm border border-red-200" variants={itemVariants}>
+                {allDriversError}
+              </motion.div>
+            )}
+
+            {allDriversLoading ? (
+              <motion.div className="text-center py-4 text-blue-600 font-medium" variants={itemVariants}>
+                Loading drivers...
+              </motion.div>
+            ) : allDrivers.length === 0 ? (
+              <motion.div className="text-center py-4 text-gray-500" variants={itemVariants}>
+                No drivers found.
+              </motion.div>
+            ) : (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-6">
+                {allDrivers.map((driver) => (
+                  <motion.div
+                    key={driver.id}
+                    className="bg-gray-50 border border-gray-200 rounded-xl shadow hover:shadow-md transition-all duration-200 p-5 flex flex-col gap-3 cursor-pointer"
+                    variants={itemVariants}
+                    onClick={() => handleDriverCardClick(driver.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-lg uppercase">
+                          {driver.driverName ? driver.driverName[0] : 'D'}
+                        </div>
+                        <div>
+                          <div className="text-md font-semibold text-gray-800">{driver.driverName || 'Unnamed'}</div>
+                          <div className="text-sm text-gray-500">{driver.regNumber || 'No Vehicle Info'}</div>
+                        </div>
+                      </div>
+                      <span className={`px-2 py-1 text-xs rounded-full font-semibold ${driver.status === 'AVAILABLE' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-800'}`}>
+                        {driver.status}
+                      </span>
+                    </div>
+
+                    <div className="text-sm text-gray-700 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <IdCard className="w-4 h-4 text-gray-400" />
+                        <span>{driver.license || 'N/A'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-gray-400" />
+                        <span>{driver.driverPhone || 'N/A'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MapPinIcon className="w-4 h-4 text-gray-400" />
+                        <span>{driver.latitude?.toFixed(4) || '—'}, {driver.longitude?.toFixed(4) || '—'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <ClockIcon className="w-4 h-4 text-gray-400" />
+                        <span>{driver.lastUpdated ? new Date(driver.lastUpdated).toLocaleString() : 'Unknown'}</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+
+            {selectedDriver && (
+              <motion.div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md bg-black/30">
+                <motion.div
+                  className="bg-white rounded-xl p-8 max-w-xl w-full border border-blue-200 shadow-lg"
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                >
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold text-xl text-blue-800">Driver Profile</h3>
+                    <button
+                      onClick={closeDriverModal}
+                      className="text-gray-500 hover:text-gray-800 text-xl font-bold"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-800">
+                    <div><span className="font-medium">ID:</span> {selectedDriver.id}</div>
+                    <div><span className="font-medium">Reg Number:</span> {selectedDriver.regNumber || 'N/A'}</div>
+                    <div><span className="font-medium">Driver Name:</span> {selectedDriver.driverName || 'N/A'}</div>
+                    <div><span className="font-medium">Driver Phone:</span> {selectedDriver.driverPhone || 'N/A'}</div>
+                    <div><span className="font-medium">Status:</span> {selectedDriver.status}</div>
+                    <div><span className="font-medium">Latitude:</span> {selectedDriver.latitude?.toFixed(6) || 'N/A'}</div>
+                    <div><span className="font-medium">Longitude:</span> {selectedDriver.longitude?.toFixed(6) || 'N/A'}</div>
+                    <div><span className="font-medium">Last Updated:</span> {selectedDriver.lastUpdated ? new Date(selectedDriver.lastUpdated).toLocaleString() : 'N/A'}</div>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
           </motion.div>
         )}
+
 
         {activeTab === 'vehicles' && (
           <motion.div className="space-y-8" variants={containerVariants} initial="hidden" animate="visible">
-            <div className="bg-white rounded-lg shadow-md p-8 border border-gray-200">
-              <SectionHeader icon={<TruckIcon />} title="Ambulance & Location Management" />
+            
+            
+            {/* 🧭 Global Title: No box here */}
+            <SectionHeader icon={<TruckIcon />} title="Ambulance & Location Management" />
 
-              {/* Fetch Location Section */}
-              <motion.div className="mb-8 p-6 bg-gray-50 rounded-lg border border-gray-200" variants={itemVariants}>
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">Fetch Ambulance Location</h3>
-                <div className="flex flex-col md:flex-row md:items-end gap-4">
-                  <div className="flex-1">
-                    <label htmlFor="ambulanceIdFetch" className="block text-sm font-medium text-gray-700 mb-2">Ambulance ID</label>
-                    <input
-                      id="ambulanceIdFetch"
-                      name="ambulanceId"
-                      value={locationForm.ambulanceId}
-                      onChange={handleLocationChange}
-                      onBlur={handleLocationBlur}
-                      className={`w-full px-4 py-3 border ${locationFormErrors.ambulanceId ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
-                      placeholder="e.g., 123"
-                    />
-                     {locationFormErrors.ambulanceId && <p className="mt-1 text-sm text-red-600">{locationFormErrors.ambulanceId}</p>}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleFetchLocation}
-                    disabled={fetchLoading}
-                    className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
-                  >
-                    {fetchLoading ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Fetching...
-                      </>
-                    ) : (
-                      <>
-                        <MagnifyingGlassIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-                        Get Location
-                      </>
-                    )}
-                  </button>
+            {/* 🚑 Fetch Ambulance Location */}
+                <motion.div
+              className="mb-10 p-6 bg-white rounded-2xl border border-gray-200 shadow-sm space-y-6"
+              variants={itemVariants}
+            >
+              <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                <MapPinIcon className="h-6 w-6 text-green-600" />
+                Ambulance Location
+              </h3>
+
+              {/* Search */}
+              <div className="flex flex-col md:flex-row gap-4 md:items-end">
+                <div className="flex-1">
+                  <label htmlFor="ambulanceIdFetch" className="block text-sm font-medium text-gray-700 mb-1">
+                    Ambulance ID
+                  </label>
+                  <input
+                    id="ambulanceIdFetch"
+                    name="ambulanceId"
+                    value={locationForm.ambulanceId}
+                    onChange={handleLocationChange}
+                    onBlur={handleLocationBlur}
+                    className={`w-full px-4 py-2.5 text-sm border ${
+                      locationFormErrors.ambulanceId ? 'border-red-500' : 'border-gray-300'
+                    } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition`}
+                    placeholder="Enter ambulance ID"
+                  />
+                  {locationFormErrors.ambulanceId && (
+                    <p className="mt-1 text-sm text-red-600">{locationFormErrors.ambulanceId}</p>
+                  )}
                 </div>
-                {fetchError && (
-                  <motion.div className="mt-4 p-3 rounded-md bg-red-50 text-red-700 text-sm border border-red-200" role="alert" variants={itemVariants}>{fetchError}</motion.div>
-                )}
-                {fetchedLocation && (
-                  <motion.div className="mt-4 p-4 rounded-md bg-blue-50 border border-blue-200 text-blue-900" variants={itemVariants}>
-                    <h4 className="font-semibold text-lg mb-2">Ambulance Location Details:</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                      <div><span className="font-medium">ID:</span> {fetchedLocation.id}</div>
-                      <div><span className="font-medium">Reg Number:</span> {fetchedLocation.regNumber || 'N/A'}</div>
-                      <div><span className="font-medium">Driver Name:</span> {fetchedLocation.driverName || 'N/A'}</div>
-                      <div><span className="font-medium">Driver Phone:</span> {fetchedLocation.driverPhone || 'N/A'}</div>
-                      <div><span className="font-medium">Status:</span> <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${fetchedLocation.status === 'AVAILABLE' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{fetchedLocation.status}</span></div>
-                      <div><span className="font-medium">Latitude:</span> {fetchedLocation.latitude?.toFixed(6) || 'N/A'}</div>
-                      <div><span className="font-medium">Longitude:</span> {fetchedLocation.longitude?.toFixed(6) || 'N/A'}</div>
-                      <div><span className="font-medium">Last Updated:</span> {fetchedLocation.lastUpdated ? new Date(fetchedLocation.lastUpdated).toLocaleString() : 'N/A'}</div>
-                    </div>
-                  </motion.div>
-                )}
-              </motion.div>
 
-              {/* Fetch by Hospital Section */}
-              <motion.div className="mb-8 p-6 bg-gray-50 rounded-lg border border-gray-200" variants={itemVariants}>
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">Ambulances by Hospital</h3>
+                <button
+                  type="button"
+                  onClick={handleFetchLocation}
+                  disabled={fetchLoading}
+                  className="inline-flex items-center justify-center px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50"
+                >
+                  {fetchLoading ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.3 0 0 5.3 0 12h4z" />
+                      </svg>
+                      Fetching...
+                    </>
+                  ) : (
+                    <>
+                      <MagnifyingGlassIcon className="h-5 w-5 mr-2" />
+                      Get Location
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Error Message */}
+              {fetchError && (
+                <motion.div
+                  className="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md"
+                  role="alert"
+                  variants={itemVariants}
+                >
+                  {fetchError}
+                </motion.div>
+              )}
+
+              {/* Map + Location Details */}
+              {fetchedLocation && (
+                <motion.div
+                  className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start"
+                  variants={itemVariants}
+                >
+                  {/* Left Side: Info */}
+                  <div className="space-y-4 bg-blue-50 border border-blue-200 p-5 rounded-lg text-sm text-blue-900 h-full">
+                    <h4 className="text-base font-semibold flex items-center gap-2">
+                      <MapPinIcon className="h-5 w-5 text-blue-600" />
+                      Location Details
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <InfoLine label="ID" value={fetchedLocation.id} />
+                      <InfoLine label="Reg Number" value={fetchedLocation.regNumber || 'N/A'} />
+                      <InfoLine label="Driver Name" value={fetchedLocation.driverName || 'N/A'} />
+                      <InfoLine label="Driver Phone" value={fetchedLocation.driverPhone || 'N/A'} />
+                      <InfoLine
+                        label="Status"
+                        value={
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            fetchedLocation.status === 'AVAILABLE'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {fetchedLocation.status}
+                          </span>
+                        }
+                      />
+                      <InfoLine label="Latitude" value={fetchedLocation.latitude?.toFixed(6) || 'N/A'} />
+                      <InfoLine label="Longitude" value={fetchedLocation.longitude?.toFixed(6) || 'N/A'} />
+                      <InfoLine label="Last Updated" value={fetchedLocation.lastUpdated ? new Date(fetchedLocation.lastUpdated).toLocaleString() : 'N/A'} />
+                    </div>
+                    <InfoLine label="Full Address" value={resolvedAddress || 'Loading...'} />
+                  </div>
+
+                  {/* Right Side: Map */}
+                  <div className="rounded-lg overflow-hidden border border-gray-300 shadow-sm h-full w-full min-h-[300px]">
+                    <iframe
+                      title="Ambulance Location Map"
+                      className="w-full h-full"
+                      src={`https://www.google.com/maps?q=${fetchedLocation.latitude},${fetchedLocation.longitude}&z=16&output=embed`}
+                      loading="eager"
+                    ></iframe>
+                  </div>
+                </motion.div>
+              )}
+            </motion.div>
+
+
+            {/* 🏥 Fetch by Hospital */}
+              <motion.div className="mb-8 p-6 bg-white rounded-2xl border border-gray-200 shadow-sm space-y-6" variants={itemVariants}>
+                {/* Header */}
+                <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                  <BuildingOfficeIcon className="h-6 w-6 text-blue-600" />
+                  Ambulances by Hospital
+                </h3>
+
+                {/* Input & Button */}
                 <div className="flex flex-col md:flex-row md:items-end gap-4">
                   <div className="flex-1">
-                    <label htmlFor="hospitalId" className="block text-sm font-medium text-gray-700 mb-2">Hospital ID</label>
-                    <input
-                      id="hospitalId"
-                      name="hospitalId"
-                      value={hospitalId}
-                      onChange={e => setHospitalId(e.target.value)}
-                      type="number"
-                      min="1"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
-                      placeholder="e.g., 1"
-                    />
+                    <label htmlFor="hospitalId" className="block text-sm font-medium text-gray-700 mb-1">
+                      Hospital ID
+                    </label>
+                    <div className="relative rounded-lg shadow-sm">
+                      <input
+                        id="hospitalId"
+                        name="hospitalId"
+                        value={hospitalId}
+                        onChange={(e) => setHospitalId(e.target.value)}
+                        type="number"
+                        min="1"
+                        className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                        placeholder="e.g., 1"
+                      />
+                      <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-400">
+                        <BuildingOfficeIcon className="h-5 w-5" />
+                      </div>
+                    </div>
                   </div>
+
                   <button
                     type="button"
                     onClick={handleFetchByHospital}
                     disabled={hospitalFetchLoading}
-                    className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                    className="inline-flex items-center justify-center px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50"
                   >
                     {hospitalFetchLoading ? (
                       <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        <svg className="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.3 0 0 5.3 0 12h4z" />
                         </svg>
                         Fetching...
                       </>
                     ) : (
                       <>
-                        <BuildingOfficeIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+                        <MagnifyingGlassIcon className="h-5 w-5 mr-2" />
                         Get by Hospital
                       </>
                     )}
                   </button>
                 </div>
+
+                {/* Error Alert */}
                 {hospitalFetchError && (
-                  <motion.div className="mt-4 p-3 rounded-md bg-red-50 text-red-700 text-sm border border-red-200" role="alert" variants={itemVariants}>{hospitalFetchError}</motion.div>
-                )}
-                {hospitalAmbulances.length > 0 && (
-                  <motion.div className="mt-4 overflow-x-auto" variants={itemVariants}>
-                    <table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-lg">
-                      <motion.thead className="bg-gray-100" variants={itemVariants}>
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">ID</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Reg Number</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Driver Name</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Latitude</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Longitude</th>
-                        </tr>
-                      </motion.thead>
-                      <motion.tbody className="bg-white divide-y divide-gray-200">
-                        {hospitalAmbulances.map((amb) => (
-                          <motion.tr key={amb.id} className="hover:bg-gray-50" variants={itemVariants}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{amb.id}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{amb.regNumber}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{amb.driverName}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${amb.status === 'AVAILABLE' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{amb.status}</span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{amb.latitude?.toFixed(6)}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{amb.longitude?.toFixed(6)}</td>
-                          </motion.tr>
-                        ))}
-                      </motion.tbody>
-                    </table>
+                  <motion.div
+                    className="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md"
+                    role="alert"
+                    variants={itemVariants}
+                  >
+                    {hospitalFetchError}
                   </motion.div>
                 )}
+
+                {/* Result Table */}
+                <motion.div className="overflow-x-auto" variants={itemVariants}>
+                <table className="min-w-full bg-white border border-gray-200 rounded-xl overflow-hidden text-sm">
+                  <thead className="bg-gray-100 text-gray-700">
+                    <tr className="rounded-t-xl">
+                      <th className="px-4 py-3  text-left font-medium">ID</th>
+                      <th className="px-4 py-3 text-left font-medium">Driver</th>
+                      <th className="px-4 py-3 text-left font-medium">Status</th>
+                      <th className="px-4 py-3 text-left font-medium">Latitude</th>
+                      <th className="px-4 py-3 text-left font-medium">Longitude</th>
+                      <th className="px-4 py-3 text-left font-medium">Location</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {hospitalAmbulances.map((amb, i) => (
+                      <tr key={amb.id} className="hover:bg-gray-50 transition">
+                        <td className="px-4 py-3 text-gray-800">{i + 1}</td>
+                        <td className="px-4 py-3 text-gray-800 flex items-center gap-2">
+                          <TruckIcon className="h-4 w-4 text-slate-400" />
+                          {amb.regNumber}
+                        </td>
+                        <td className="px-4 py-3 text-gray-800 flex items-center gap-2">
+                          <UserIcon className="h-4 w-4 text-slate-400" />
+                          {amb.driverName}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            amb.status === 'AVAILABLE'
+                              ? 'bg-green-50 text-green-700'
+                              : amb.status === 'EN_ROUTE'
+                              ? 'bg-yellow-50 text-yellow-700'
+                              : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {amb.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-gray-800">
+                          <MapPinIcon className="h-4 w-4 inline mr-1 text-slate-400" />
+                          {amb.latitude?.toFixed(6)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-800">
+                          <MapPinIcon className="h-4 w-4 inline mr-1 text-slate-400" />
+                          {amb.longitude?.toFixed(6)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </motion.div>
 
-              {/* Update Ambulance Location Form */}
-              <motion.div className="p-6 bg-gray-50 rounded-lg border border-gray-200" variants={itemVariants}>
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">Update Ambulance Live Location</h3>
-                <form onSubmit={handleLocationSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              </motion.div>
+
+
+            {/* 📍 Update Ambulance Location Form */}
+                <motion.div
+                  className="p-6 bg-white rounded-2xl border border-gray-200 shadow-sm"
+                  variants={itemVariants}
+                >
+                  <h3 className="text-xl font-semibold text-gray-800 mb-6">Update Ambulance Live Location</h3>
+                  <form onSubmit={handleLocationSubmit} className="space-y-5">
+                    
+                    {/* Ambulance ID */}
                     <motion.div variants={itemVariants}>
-                      <label htmlFor="ambulanceIdUpdate" className="block text-sm font-medium text-gray-700 mb-2">Ambulance ID</label>
+                      <label htmlFor="ambulanceIdUpdate" className="block text-sm font-medium text-gray-700 mb-1">
+                        Ambulance ID
+                      </label>
                       <input
                         id="ambulanceIdUpdate"
                         name="ambulanceId"
@@ -1183,30 +1500,21 @@ export default function AmbulanceDashboard() {
                         onChange={handleLocationChange}
                         onBlur={handleLocationBlur}
                         required
-                        className={`w-full px-4 py-3 border ${locationFormErrors.ambulanceId ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
+                        className={`w-full px-4 py-2.5 border ${
+                          locationFormErrors.ambulanceId ? 'border-red-500' : 'border-gray-300'
+                        } rounded-xl focus:ring-blue-500 focus:border-blue-500 text-gray-800`}
                         placeholder="Enter ambulance ID"
                       />
-                      {locationFormErrors.ambulanceId && <p className="mt-1 text-sm text-red-600">{locationFormErrors.ambulanceId}</p>}
+                      {locationFormErrors.ambulanceId && (
+                        <p className="mt-1 text-sm text-red-600">{locationFormErrors.ambulanceId}</p>
+                      )}
                     </motion.div>
+
+                    {/* Latitude */}
                     <motion.div variants={itemVariants}>
-                      <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                      <select
-                        id="status"
-                        name="status"
-                        value={locationForm.status}
-                        onChange={handleLocationChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm bg-white"
-                      >
-                        <option value="AVAILABLE">Available</option>
-                        <option value="ON_CALL">On Call</option>
-                        <option value="MAINTENANCE">Maintenance</option>
-                        <option value="OFFLINE">Offline</option>
-                      </select>
-                    </motion.div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <motion.div variants={itemVariants}>
-                      <label htmlFor="latitude" className="block text-sm font-medium text-gray-700 mb-2">Latitude</label>
+                      <label htmlFor="latitude" className="block text-sm font-medium text-gray-700 mb-1">
+                        Latitude
+                      </label>
                       <input
                         id="latitude"
                         name="latitude"
@@ -1216,13 +1524,21 @@ export default function AmbulanceDashboard() {
                         type="number"
                         step="any"
                         required
-                        className={`w-full px-4 py-3 border ${locationFormErrors.latitude ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
-                        placeholder="e.g., 28.7041"
+                        className={`w-full px-4 py-2.5 border ${
+                          locationFormErrors.latitude ? 'border-red-500' : 'border-gray-300'
+                        } rounded-xl focus:ring-blue-500 focus:border-blue-500 text-gray-800`}
+                        placeholder="e.g., 18.5204"
                       />
-                      {locationFormErrors.latitude && <p className="mt-1 text-sm text-red-600">{locationFormErrors.latitude}</p>}
+                      {locationFormErrors.latitude && (
+                        <p className="mt-1 text-sm text-red-600">{locationFormErrors.latitude}</p>
+                      )}
                     </motion.div>
+
+                    {/* Longitude */}
                     <motion.div variants={itemVariants}>
-                      <label htmlFor="longitude" className="block text-sm font-medium text-gray-700 mb-2">Longitude</label>
+                      <label htmlFor="longitude" className="block text-sm font-medium text-gray-700 mb-1">
+                        Longitude
+                      </label>
                       <input
                         id="longitude"
                         name="longitude"
@@ -1232,387 +1548,249 @@ export default function AmbulanceDashboard() {
                         type="number"
                         step="any"
                         required
-                        className={`w-full px-4 py-3 border ${locationFormErrors.longitude ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
-                        placeholder="e.g., 77.1025"
+                        className={`w-full px-4 py-2.5 border ${
+                          locationFormErrors.longitude ? 'border-red-500' : 'border-gray-300'
+                        } rounded-xl focus:ring-blue-500 focus:border-blue-500 text-gray-800`}
+                        placeholder="e.g., 73.8567"
                       />
-                      {locationFormErrors.longitude && <p className="mt-1 text-sm text-red-600">{locationFormErrors.longitude}</p>}
+                      {locationFormErrors.longitude && (
+                        <p className="mt-1 text-sm text-red-600">{locationFormErrors.longitude}</p>
+                      )}
                     </motion.div>
-                  </div>
-                  <motion.button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
-                    variants={itemVariants}
-                  >
-                    {loading ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Updating...
-                      </>
-                    ) : (
-                      <>
-                        <MapPinIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-                        Update Location
-                      </>
-                    )}
-                  </motion.button>
-                  {message && (
-                    <motion.div
-                      className={`mt-4 p-3 rounded-md text-sm border ${
-                        message.includes('success')
-                          ? 'bg-green-50 text-green-700 border-green-200'
-                          : 'bg-red-50 text-red-700 border-red-200'
-                      }`}
-                      role="alert"
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                    >
-                      {message}
-                    </motion.div>
-                  )}
-                </form>
-              </motion.div>
 
-              {/* Driver Request History Section */}
-              <motion.div className="p-6 bg-gray-50 rounded-lg border border-gray-200" variants={itemVariants}>
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">Driver Request History</h3>
-                <div className="flex flex-col md:flex-row md:items-end gap-4 mb-4">
-                  <button
-                    type="button"
-                    onClick={handleFetchHistory}
-                    disabled={historyLoading}
-                    className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
-                  >
-                    {historyLoading ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Fetching...
-                      </>
-                    ) : (
-                      <>
-                        <CalendarDaysIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-                        Get Request History
-                      </>
-                    )}
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <label htmlFor="historyStatusFilter" className="text-sm font-medium text-gray-700">Status:</label>
-                    <select
-                      id="historyStatusFilter"
-                      value={historyStatusFilter}
-                      onChange={e => setHistoryStatusFilter(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                    {/* Submit Button */}
+                    <motion.button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full inline-flex items-center justify-center px-4 py-3 rounded-xl text-white bg-blue-600 hover:bg-blue-700 transition disabled:opacity-50"
+                      variants={itemVariants}
                     >
-                      <option value="">All</option>
-                      <option value="PENDING">Pending</option>
-                      <option value="COMPLETED">Completed</option>
-                      <option value="CANCELLED">Cancelled</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label htmlFor="historySort" className="text-sm font-medium text-gray-700">Sort:</label>
-                    <button
-                      id="historySort"
-                      type="button"
-                      onClick={() => setHistorySortDesc(v => !v)}
-                      className="px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
-                    >
-                      {historySortDesc ? 'Newest First' : 'Oldest First'}
-                    </button>
-                  </div>
-                </div>
-                {historyError && (
-                  <motion.div className="mt-4 p-3 rounded-md bg-red-50 text-red-700 text-sm border border-red-200" role="alert" variants={itemVariants}>{historyError}</motion.div>
-                )}
-                {filteredHistory.length > 0 && (
-                  <motion.div className="mt-4" variants={itemVariants}>
-                    <div className="mb-4 font-semibold text-gray-700">Total Requests: {filteredHistory.length}</div>
-                    {completeMessage && (
+                      {loading ? (
+                        <>
+                          <svg className="animate-spin mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          Updating...
+                        </>
+                      ) : (
+                        <>
+                          <MapPinIcon className="mr-2 h-5 w-5" aria-hidden="true" />
+                          Update Location
+                        </>
+                      )}
+                    </motion.button>
+
+                    {/* Success/Error Message */}
+                    {message && (
                       <motion.div
-                        className={`mb-4 p-3 rounded-md text-sm border ${completeMessage.includes('completed') ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}
+                        className={`mt-3 p-3 rounded-md text-sm border ${
+                          message.includes('success')
+                            ? 'bg-green-50 text-green-700 border-green-300'
+                            : 'bg-red-50 text-red-700 border-red-300'
+                        }`}
                         role="alert"
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                       >
-                        {completeMessage}
+                        {message}
                       </motion.div>
                     )}
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-lg">
-                        <motion.thead className="bg-gray-100" variants={itemVariants}>
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">ID</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">User ID</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Requester Email</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Requested At</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Location</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Action</th>
-                          </tr>
-                        </motion.thead>
-                        <motion.tbody className="bg-white divide-y divide-gray-200">
-                          {filteredHistory.map((item) => (
-                            <motion.tr key={item.id} className="hover:bg-gray-50" variants={itemVariants}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{item.id}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{item.userId}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{item.emailOfRequester}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{new Date(item.requestedAt).toLocaleString()}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{item.latitude?.toFixed(6)}, {item.longitude?.toFixed(6)}</td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${item.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : item.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}`}>{item.status}</span>
-                              </td>
-                             <td className="px-6 py-4 whitespace-nowrap">
-                               {item.status === 'PENDING' && (
-                                 <button
-                                   type="button"
-                                   onClick={() => handleCompleteBooking(item.id)}
-                                   disabled={completeLoadingId === item.id}
-                                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 transition-colors"
-                                 >
-                                   {completeLoadingId === item.id ? (
-                                    <>
-                                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                      </svg>
-                                      Completing...
-                                    </>
-                                   ) : (
-                                     'Complete'
-                                   )}
-                                 </button>
-                               )}
-                             </td>
-                            </motion.tr>
-                          ))}
-                        </motion.tbody>
-                      </table>
-                    </div>
-                  </motion.div>
-                )}
-              </motion.div>
-            </div>
+                  </form>
+                </motion.div>
+            
           </motion.div>
         )}
 
         {activeTab === 'emergencies' && (
-          <motion.div className="bg-white rounded-lg shadow-md p-8 border border-gray-200" variants={containerVariants} initial="hidden" animate="visible">
+          <motion.div
+            className="bg-gray-50 rounded-2xl shadow-sm p-6 border border-gray-200 relative"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
             <SectionHeader icon={<ExclamationCircleIcon />} title="Recent Emergencies" />
-            {emergenciesLoading ? (
-              <motion.div className="text-center py-8 text-blue-600 font-semibold" variants={itemVariants}>Loading emergencies...</motion.div>
-            ) : emergenciesError ? (
-              <motion.div className="text-center py-8 text-red-600 font-semibold" variants={itemVariants}>{emergenciesError}</motion.div>
-            ) : recentEmergencies.length === 0 ? (
-              <motion.div className="text-center py-8 text-gray-500" variants={itemVariants}>No recent emergencies found.</motion.div>
-            ) : (
-              <div className="overflow-x-auto">
-                <motion.table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-lg" initial="hidden" animate="visible" variants={containerVariants}>
-                  <motion.thead className="bg-gray-50" variants={itemVariants}>
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">ID</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Issue</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Created At</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Victim Phone</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Pickup Lat</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Pickup Lng</th>
-                    </tr>
-                  </motion.thead>
-                  <motion.tbody className="bg-white divide-y divide-gray-200">
-                    {recentEmergencies.map((em) => (
-                      <motion.tr key={em.booking_id} className="hover:bg-gray-50" variants={itemVariants}>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{em.booking_id}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{em.issue_type}</td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${em.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{em.status}</span>
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{new Date(em.created_at).toLocaleString()}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{em.victim_phone_number}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{em.pickup_latitude}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{em.pickup_longitude}</td>
-                      </motion.tr>
-                    ))}
-                  </motion.tbody>
-                </motion.table>
-              </div>
-            )}
-          </motion.div>
-        )}
 
-        {activeTab === 'rankings' && (
-          <motion.div className="bg-white rounded-lg shadow-md p-8 border border-gray-200" variants={containerVariants} initial="hidden" animate="visible">
-            <SectionHeader icon={<TrophyIcon />} title="Ambulance Rankings" />
-            {ambulancesLoading ? (
-              <motion.div className="text-center py-8 text-blue-600 font-semibold" variants={itemVariants}>Loading rankings...</motion.div>
-            ) : ambulancesError ? (
-              <motion.div className="text-center py-8 text-red-600 font-semibold" variants={itemVariants}>{ambulancesError}</motion.div>
+            {emergenciesLoading ? (
+              <motion.div className="text-center py-10 text-blue-600 font-medium" variants={itemVariants}>
+                Loading emergencies...
+              </motion.div>
+            ) : emergenciesError ? (
+              <motion.div className="text-center py-10 text-red-600 font-medium" variants={itemVariants}>
+                {emergenciesError}
+              </motion.div>
+            ) : recentEmergencies.length === 0 ? (
+              <motion.div className="text-center py-10 text-gray-500" variants={itemVariants}>
+                No recent emergencies found.
+              </motion.div>
             ) : (
-              <div className="overflow-x-auto">
-                <motion.table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-lg" initial="hidden" animate="visible" variants={containerVariants}>
-                  <motion.thead className="bg-gray-50" variants={itemVariants}>
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">#</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Reg Number</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Driver Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Driver Phone</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Latitude</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Longitude</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Last Updated</th>
-                    </tr>
-                  </motion.thead>
-                  <motion.tbody className="bg-white divide-y divide-gray-200">
-                    {ambulances.length === 0 ? (
-                      <motion.tr variants={itemVariants}>
-                        <td colSpan={8} className="text-center py-8 text-gray-500">No ambulances found.</td>
-                      </motion.tr>
-                    ) : ambulances.map((amb, idx) => (
-                      <motion.tr key={amb.id} className="hover:bg-gray-50 transition" variants={itemVariants}>
-                        <td className="px-6 py-4 whitespace-nowrap border-b border-gray-200 text-sm text-gray-800">{idx + 1}</td>
-                        <td className="px-6 py-4 whitespace-nowrap border-b border-gray-200 text-sm text-gray-900">{amb.regNumber}</td>
-                        <td className="px-6 py-4 whitespace-nowrap border-b border-gray-200 text-sm text-gray-900">{amb.driverName}</td>
-                        <td className="px-6 py-4 whitespace-nowrap border-b border-gray-200 text-sm text-gray-900">{amb.driverPhone}</td>
-                        <td className="px-6 py-4 whitespace-nowrap border-b border-gray-200">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full
-                            ${amb.status === 'AVAILABLE' ? 'bg-green-100 text-green-800' :
-                              amb.status === 'ON_CALL' ? 'bg-yellow-100 text-yellow-800' :
-                              amb.status === 'MAINTENANCE' ? 'bg-purple-100 text-purple-800' :
-                              'bg-gray-100 text-gray-800'}
-                          `}>{amb.status}</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap border-b border-gray-200 text-sm text-gray-700">{Number(amb.latitude).toFixed(4)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap border-b border-gray-200 text-sm text-gray-700">{Number(amb.longitude).toFixed(4)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap border-b border-gray-200 text-sm text-gray-700">{new Date(amb.lastUpdated).toLocaleString()}</td>
-                      </motion.tr>
-                    ))}
-                  </motion.tbody>
-                </motion.table>
-              </div>
+              <>
+                <div className="overflow-x-auto">
+                  <motion.table
+                    className="min-w-full text-sm text-gray-800 bg-white border border-gray-300 rounded-xl overflow-hidden"
+                    initial="hidden"
+                    animate="visible"
+                    variants={containerVariants}
+                  >
+                    <motion.thead className="bg-gray-100" variants={itemVariants}>
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">ID</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Issue</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Created At</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Phone</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Location</th>
+                      </tr>
+                    </motion.thead>
+                    <motion.tbody className="divide-y divide-gray-200">
+                      {recentEmergencies.map((em) => (
+                        <motion.tr
+                          key={em.booking_id}
+                          className="hover:bg-gray-50 transition-colors duration-150"
+                          variants={itemVariants}
+                          onMouseEnter={() => {
+                            setHoveredCoords({ lat: em.pickup_latitude, lng: em.pickup_longitude });
+                            setHoveredEmergencyId(em.booking_id);
+                          }}
+                          onMouseLeave={() => {
+                            setHoveredCoords(null);
+                            setHoveredEmergencyId(null);
+                          }}
+                        >
+                          <td className="px-4 py-3">{em.booking_id}</td>
+                          <td className="px-4 py-3">{em.issue_type}</td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                                em.status === 'COMPLETED'
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-yellow-100 text-yellow-700'
+                              }`}
+                            >
+                              {em.status === 'COMPLETED' ? (
+                                <CheckCircleIcon className="h-4 w-4" />
+                              ) : (
+                                <ClockIcon className="h-4 w-4" />
+                              )}
+                              {em.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">{new Date(em.created_at).toLocaleString()}</td>
+                          <td className="px-4 py-3">{em.victim_phone_number}</td>
+                          <td className="px-4 py-3 text-blue-600 hover:underline cursor-pointer">
+                            <MapPinIcon className="inline-block h-4 w-4 text-gray-500 mr-1" />
+                            {emergencyAddresses[em.booking_id] || 'Loading...'}
+                          </td>
+                        </motion.tr>
+                      ))}
+                    </motion.tbody>
+                  </motion.table>
+                </div>
+
+                {/* 🗺 Floating map at center (global position) */}
+                {hoveredCoords && hoveredEmergencyId && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+                    <div className="relative w-[60%] h-[50%] border-2 border-white shadow-xl rounded-xl overflow-hidden pointer-events-auto bg-white"
+                      onMouseLeave={() => {
+                        setHoveredCoords(null);
+                        setHoveredEmergencyId(null);
+                      }}
+                    >
+                      <iframe
+                        className="w-full h-full"
+                        src={`https://maps.google.com/maps?q=${hoveredCoords.lat},${hoveredCoords.lng}&z=16&output=embed`}
+                        loading="lazy"
+                        allowFullScreen
+                      ></iframe>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </motion.div>
         )}
 
         {activeTab === 'profile' && (
-          <motion.div className="max-w-4xl mx-auto" variants={containerVariants} initial="hidden" animate="visible">
-            <div className="bg-white rounded-lg shadow-md p-8 border border-gray-200">
-              <div className="flex items-center justify-between mb-6">
-                <SectionHeader icon={<UserCircleIcon />} title="Ambulance Service Profile" />
-                <button className="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors p-2 rounded-md hover:bg-gray-100">Edit Profile</button>
-              </div>
+            <motion.div
+              className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+            >
+              <div className="bg-white/70 backdrop-blur-md rounded-2xl shadow-xl p-8 border border-gray-100">
 
-              {profileLoading && (
-                <motion.div className="text-center py-8 text-blue-600 font-semibold" variants={itemVariants}>
-                  Loading profile data...
-                </motion.div>
-              )}
+                {/* Section Header */}
+                <div className="flex items-center gap-2 mb-8">
+                  <UserCircleIcon className="text-brand w-6 h-6" />
+                  <h2 className="text-xl font-bold text-gray-800">Profile</h2>
+                </div>
 
-              {profileError && (
-                <motion.div className="text-center py-8 text-red-600 font-semibold" variants={itemVariants}>
-                  {profileError}
-                </motion.div>
-              )}
+                {/* Loading */}
+                {profileLoading && (
+                  <motion.div className="text-center py-10 text-brand font-semibold" variants={itemVariants}>
+                    Loading profile data...
+                  </motion.div>
+                )}
 
-              {!profileLoading && !profileError && (
+                {/* Error */}
+                {profileError && (
+                  <motion.div className="text-center py-10 text-red-600 font-semibold" variants={itemVariants}>
+                    {profileError}
+                  </motion.div>
+                )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Service Information */}
-                <motion.div variants={itemVariants}>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Personal Information</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-md">
-                        <TruckIcon className="h-8 w-8" />
+                {/* Profile Info */}
+                {!profileLoading && !profileError && (
+                  <motion.div
+                    variants={itemVariants}
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4 }}
+                  >
+                    <div className="flex items-center space-x-8 border border-gray-200 rounded-xl p-6 bg-gradient-to-br from-white via-green-50 to-white shadow-sm hover:shadow-md transition-shadow">
+                      
+                      {/* Profile Image - Larger */}
+                      <div className="relative w-32 h-32">
+                        <img
+                          src={AmbulanceAdmin}
+                          alt="Profile"
+                          className="w-full h-full rounded-full object-cover border-4 border-white shadow-md"
+                        />
+                        <div className="absolute -inset-1 rounded-full bg-highlight-green opacity-10 blur-lg"></div>
                       </div>
-                      <div>
-                        <h4 className="font-semibold text-gray-900">{profileData.name}</h4>
-                        <p className="text-sm text-gray-600">Badge: {profileData.badge}</p>
+
+                      {/* Profile Fields with Icons */}
+                      <div className="flex-1">
+                        <dl className="divide-y divide-gray-200 text-sm text-gray-700 space-y-3">
+                          <ProfileItem icon={<Fingerprint className="text-brand w-4 h-4" />} label="User ID" value={profileData.id} />
+                          <ProfileItem icon={<User className="text-brand w-4 h-4" />} label="Full Name" value={profileData.fullName} />
+                          <ProfileItem icon={<Mail className="text-brand w-4 h-4" />} label="Email" value={profileData.email} />
+                          <ProfileItem icon={<Phone className="text-brand w-4 h-4" />} label="Phone" value={profileData.phoneNumber} />
+                          <ProfileItem icon={<IdCard className="text-brand w-4 h-4" />} label="Govt ID" value={profileData.governmentId} />
+                        </dl>
                       </div>
                     </div>
-                    <div className="space-y-3 border border-gray-200 rounded-lg p-4">
-                      <div className="flex justify-between py-2 border-b border-gray-100">
-                        <span className="text-gray-600">User ID:</span>
-                        <span className="font-medium text-gray-800">{userInfo.userId || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b border-gray-100">
-                        <span className="text-gray-600">Email:</span>
-                        <span className="font-medium text-gray-800">{profileData.email || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2">
-                        <span className="text-gray-600">Role:</span>
-                        <span className="font-medium text-gray-800">{userInfo.role || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2 border-t border-gray-100 mt-4">
-                        <span className="text-gray-600">Rank:</span>
-                        <span className="font-medium text-gray-800">{profileData.rank || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2">
-                        <span className="text-gray-600">Department:</span>
-                        <span className="font-medium text-gray-800">{profileData.department || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2">
-                        <span className="text-gray-600">Experience:</span>
-                        <span className="font-medium text-gray-800">{profileData.experience || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between py-2">
-                        <span className="text-gray-600">Phone:</span>
-                        <span className="font-medium text-gray-800">{profileData.phone || 'N/A'}</span>
-                      </div>
-                    </div>
+
+                    {/* Button - moved to bottom */}
+                     <div className="flex justify-center mt-6">
+                    <button className="bg-green-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-all shadow-sm">
+                      Edit Profile
+                    </button>
                   </div>
-                </motion.div>
-
-                {/* Performance Metrics */}
-                <motion.div variants={itemVariants}>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Statistics</h3>
-                  <div className="space-y-4">
-                    <div className="bg-gray-100 p-4 rounded-lg shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-blue-700 font-medium">Emergencies Responded</span>
-                        <span className="text-2xl font-bold text-blue-700">156</span>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">This month</p>
-                    </div>
-                    <div className="bg-gray-100 p-4 rounded-lg shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-green-700 font-medium">Response Time</span>
-                        <span className="text-2xl font-bold text-green-700">4.2 min</span>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">Average</p>
-                    </div>
-                    <div className="bg-gray-100 p-4 rounded-lg shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-yellow-700 font-medium">Patient Satisfaction</span>
-                        <span className="text-2xl font-bold text-yellow-700">4.8/5</span>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">Average rating</p>
-                    </div>
-                    <div className="bg-gray-100 p-4 rounded-lg shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-purple-700 font-medium">Service Hours</span>
-                        <span className="text-2xl font-bold text-purple-700">1,890</span>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">This year</p>
-                    </div>
-                  </div>
-                </motion.div>
+                  </motion.div>
+                )}
               </div>
-              )}
-            </div>
-          </motion.div>
+            </motion.div>
+
         )}
+
 
         {activeTab === 'register' && (
           <motion.div className="max-w-2xl mx-auto" variants={containerVariants} initial="hidden" animate="visible">
             <div className="bg-white p-8 rounded-lg shadow-xl border border-gray-200">
               <div className="text-center mb-8">
-                <SectionHeader icon={<PlusCircleIcon />} title="Register Admin" />
-                <p className="text-gray-600">Add a new admin user to the emergency response system</p>
+                <SectionHeader icon={<PlusCircleIcon />} title="Register Driver" />
+                <p className="text-gray-600">Add a new driver to the emergency response system</p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -1707,7 +1885,7 @@ export default function AmbulanceDashboard() {
                         onBlur={handleBlur}
                         required
                         className={`w-full px-4 py-3 pl-10 border ${formErrors.licenseNumber ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
-                        placeholder="e.g., MH-FIRE-0234"
+                        placeholder="e.g., MH-AMBU-0234"
                         maxLength="20"
                       />
                       <IdentificationIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -1755,23 +1933,23 @@ export default function AmbulanceDashboard() {
                     {formErrors.password && <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>}
                   </motion.div>
                   <motion.div variants={itemVariants}>
-                    <label htmlFor="fireStationId" className="block text-sm font-medium text-gray-700 mb-2">Fire Station ID</label>
+                    <label htmlFor="hospitalID" className="block text-sm font-medium text-gray-700 mb-2">Hospital ID</label>
                     <div className="relative">
                       <input
-                        id="fireStationId"
-                        name="fireStationId"
-                        value={form.fireStationId}
+                        id="hospitalID"
+                        name="hospitalID"
+                        value={form.hospitalID}
                         onChange={handleChange}
                         onBlur={handleBlur}
                         type="number"
                         required
-                        className={`w-full px-4 py-3 pl-10 border ${formErrors.fireStationId ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
-                        placeholder="Enter fire station ID"
+                        className={`w-full px-4 py-3 pl-10 border ${form.ErrorshospitalID ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
+                        placeholder="Enter Hospital ID"
                         min="1"
                       />
                       <BuildingOfficeIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                     </div>
-                    {formErrors.fireStationId && <p className="mt-1 text-sm text-red-600">{formErrors.fireStationId}</p>}
+                    {form.ErrorshospitalID && <p className="mt-1 text-sm text-red-600">{form.ErrorshospitalID}</p>}
                   </motion.div>
                 </div>
 
@@ -1830,7 +2008,7 @@ export default function AmbulanceDashboard() {
                   ) : (
                     <>
                       <PlusCircleIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-                      Register Admin
+                      Register Driver
                     </>
                   )}
                 </motion.button>

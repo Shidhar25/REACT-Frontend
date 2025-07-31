@@ -54,7 +54,6 @@ public class SecurityConfig {
                                     "/swagger-ui/**",
                                     "/v3/api-docs/**"
                             ).permitAll()
-                            .requestMatchers("/api/user/**").hasAuthority("USER")
                             .anyRequest().authenticated();
                 })
                 .addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class)

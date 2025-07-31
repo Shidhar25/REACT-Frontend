@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -37,6 +38,9 @@ public class AmbulanceServiceImpl implements AmbulanceService {
 
     @Override
     public List<AmbulanceDto> getAllAmbulances() {
+        List<AmbulanceEntity> entityList = ambulanceRepository.findAll();
+        List<AmbulanceDto> dto =  new ArrayList<>();
+
         return ambulanceRepository.findAll().stream()
                 .map(AmbulanceDto::new)
                 .collect(Collectors.toList());

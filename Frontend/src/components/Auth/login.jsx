@@ -82,8 +82,11 @@ function Login() {
           navigate('/police-admin-dashboard');
           break;
         default:
-          console.log('No matching role found, navigating to user-dashboard. Role was:', userInfo.role);
-          navigate('/user-dashboard');
+           console.log('No matching role found, navigating to user-dashboard. Role was:', userInfo.role);
+            navigate('/login');
+          // If no matching role, redirect to user-dashboard or login
+            break;
+
       }
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');
