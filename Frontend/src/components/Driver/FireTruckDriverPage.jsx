@@ -5,7 +5,7 @@ import { motion, useMotionValue, useSpring } from 'framer-motion';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { UserIcon, HomeIcon, ClockIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
-
+import reactLogo from '../../assets/react-logo.png';
 // IMPORTANT: Replace with your actual Google Maps API Key and consider environment variables
 const Maps_API_KEY = 'AIzaSyCnwJl8uyVjTS8ql060q5d0az43nvVsyUw'; // <<<--- Replace this
 
@@ -207,15 +207,25 @@ export default function FireTruckDriverPage() {
     }
   };
 
-  // Fetch profile when profile page is active
   useEffect(() => {
-    if (activePage === 'profile') {
-      fetchProfile();
-    }
-    if (activePage === 'history') {
-      fetchHistory();
-    }
-  }, [activePage]);
+
+    fetchProfile();
+
+
+    fetchHistory();
+  }, []);
+
+
+
+  // Fetch profile when profile page is active
+  // useEffect(() => {
+  //   if (activePage === 'profile') {
+  //     fetchProfile();
+  //   }
+  //   if (activePage === 'history') {
+  //     fetchHistory();
+  //   }
+  // }, [activePage]);
 
   useEffect(() => {
     const moveCursor = (e) => {
@@ -250,9 +260,9 @@ export default function FireTruckDriverPage() {
           const data = await res.json();
           setAppointment(data);
           if (data) {
-              toast.info('New assignment received!', { autoClose: 5000 });
+            toast.info('New assignment received!', { autoClose: 5000 });
           } else {
-              toast.info('No active assignments.');
+            toast.info('No active assignments.');
           }
         } else {
           const data = await res.json();
@@ -271,9 +281,9 @@ export default function FireTruckDriverPage() {
 
   useEffect(() => {
     if (!navigator.geolocation) {
-        setError('Geolocation is not supported by your browser.');
-        toast.error('Geolocation is not supported by your browser.');
-        return;
+      setError('Geolocation is not supported by your browser.');
+      toast.error('Geolocation is not supported by your browser.');
+      return;
     }
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
@@ -283,9 +293,9 @@ export default function FireTruckDriverPage() {
         });
       },
       (err) => {
-          console.error('Geolocation error:', err);
-          setError(`Geolocation error: ${err.message}. Please enable location services.`);
-          toast.error(`Geolocation error: ${err.message}`);
+        console.error('Geolocation error:', err);
+        setError(`Geolocation error: ${err.message}. Please enable location services.`);
+        toast.error(`Geolocation error: ${err.message}`);
       },
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
@@ -613,74 +623,104 @@ export default function FireTruckDriverPage() {
       </motion.div>
 
       <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop={true} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
+      {/* Custom Admin Navbar */}
+      <div className="border-b border-gray-200">
+        {/* Header Top Bar */}
+        <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+          {/* Left - Logo */}
+          <div className="flex items-center gap-4">
+            <img
+              src={reactLogo}
+              alt="Logo"
+              className="h-14 w-14 object-contain rounded-xl bg-white p-2 shadow-sm"
+            />
+            <div>
+              <h1 className="text-xl font-semibold text-gray-800">Fire Driver</h1>
+            </div>
+          </div>
 
-      {/* Top Bar */}
-      <header
-        className="flex items-center justify-between text-white px-6 py-3 shadow-lg border-b border-white/20"
-        style={{
-          backgroundColor: 'var(--neutral-bg-main)', // Use main background from palette
-          color: 'var(--neutral-text-header)',
-          backdropFilter: 'blur(12px)',
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <img src={profile.avatar} alt="avatar" className="w-12 h-12 rounded-full border-2 border-blue-400 shadow-lg" />
-          <div>
-            <div className="font-bold text-lg" style={{ color: 'var(--neutral-text-header)' }}>{profile.name}</div>
-            <div className="text-sm flex items-center gap-1" style={{ color: 'var(--neutral-text-placeholder)' }}>
-              <FaPhoneAlt className="inline mr-1 text-blue-400" />
-              {profile.phone}
+          {/* Right - User Info & Actions */}
+          <div className="flex items-center gap-6">
+            {/* User Info */}
+            <div className="text-right">
+              <p className="text-sm text-gray-600">Welcome {profile.name}</p>
+              <p className="text-xs text-gray-400">Updated: {new Date().toLocaleTimeString()}</p>
+            </div>
+
+            {/* Profile Image */}
+            <img
+              src={profile.avatar}
+              alt="Admin"
+              className="h-10 w-10 rounded-full object-cover border-2 border-white shadow"
+            />
+
+            {/* Icon Actions */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => window.location.href = '/'}
+                title="Home"
+                className="text-gray-600 hover:text-green-600 transition"
+              >
+                <HomeIcon className="h-6 w-6" />
+              </button>
+              <button
+                onClick={handleLogout}
+                title="Logout"
+                className="text-red-600 hover:text-red-800 transition"
+              >
+                {/* You may need to import ArrowRightOnRectangleIcon or use a similar icon */}
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" /></svg>
+              </button>
             </div>
           </div>
         </div>
-        <button
-          onClick={handleLogout}
-          className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-white font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
-          onMouseEnter={handleCursorEnter}
-          onMouseLeave={handleCursorLeave}
-        >
-          Logout
-        </button>
-      </header>
+      </div>
 
 
       <div className="w-full max-w-7xl mx-auto">
         {/* Horizontal Navbar - Enhanced Styling */}
-        <nav
-          className="flex flex-row items-center justify-center gap-4 py-4 px-4 border-b border-white/20 shadow-lg"
-          style={{ backgroundColor: 'var(--green-sidebar-accent)' }}
-        >
-          <motion.button
-            onClick={() => setActivePage('dashboard')}
-            className={`flex items-center gap-2 px-5 py-2 rounded-lg font-semibold transition-all duration-200 text-base ${activePage === 'dashboard' ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-white/20 text-white'}`}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.97 }}
-            onMouseEnter={handleCursorEnter}
-            onMouseLeave={handleCursorLeave}
+        <div className="w-full flex justify-center bg-[#E8E6E0] py-6">
+          <nav
+            className="bg-[#fef4f4] border border-red-200 rounded-full shadow-lg px-4 py-2 flex space-x-4 overflow-x-auto max-w-3xl"
+            style={{ backgroundColor: '#fff4f4' }} // light red/pinkish tone (emergency/safety)
           >
-            <HomeIcon className="h-5 w-5" /> Dashboard
-          </motion.button>
-          <motion.button
-            onClick={() => setActivePage('history')}
-            className={`flex items-center gap-2 px-5 py-2 rounded-lg font-semibold transition-all duration-200 text-base ${activePage === 'history' ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-white/20 text-white'}`}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.97 }}
-            onMouseEnter={handleCursorEnter}
-            onMouseLeave={handleCursorLeave}
-          >
-            <ClockIcon className="h-5 w-5" /> Booking History
-          </motion.button>
-          <motion.button
-            onClick={() => setActivePage('profile')}
-            className={`flex items-center gap-2 px-5 py-2 rounded-lg font-semibold transition-all duration-200 text-base ${activePage === 'profile' ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-white/20 text-white'}`}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.97 }}
-            onMouseEnter={handleCursorEnter}
-            onMouseLeave={handleCursorLeave}
-          >
-            <UserIcon className="h-5 w-5" /> Profile
-          </motion.button>
-        </nav>
+            <motion.button
+              onClick={() => setActivePage('dashboard')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
+        ${activePage === 'dashboard' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.97 }}
+              onMouseEnter={handleCursorEnter}
+              onMouseLeave={handleCursorLeave}
+            >
+              <HomeIcon className="h-5 w-5" /> Dashboard
+            </motion.button>
+
+            <motion.button
+              onClick={() => setActivePage('history')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
+        ${activePage === 'history' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.97 }}
+              onMouseEnter={handleCursorEnter}
+              onMouseLeave={handleCursorLeave}
+            >
+              <ClockIcon className="h-5 w-5" /> Booking History
+            </motion.button>
+
+            <motion.button
+              onClick={() => setActivePage('profile')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
+        ${activePage === 'profile' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.97 }}
+              onMouseEnter={handleCursorEnter}
+              onMouseLeave={handleCursorLeave}
+            >
+              <UserIcon className="h-5 w-5" /> Profile
+            </motion.button>
+          </nav>
+        </div>
 
         {/* Main Content */}
         <main
@@ -691,122 +731,85 @@ export default function FireTruckDriverPage() {
             <motion.div variants={containerVariants} initial="hidden" animate="visible">
 
               {/* Location Update Controls */}
-              <motion.div
-                className="bg-white/10 backdrop-blur-md rounded-xl shadow-lg border border-white/20 p-6 mb-6"
-                variants={itemVariants}
-                onMouseEnter={handleCursorEnter}
-                onMouseLeave={handleCursorLeave}
-              >
-                <h3 className="text-lg font-semibold text-black mb-4 flex items-center gap-2">
-                  <MdLocationOn className="text-xl text-red-400" />
-                  Location Management
-                </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                    <h4 className="text-black font-semibold mb-2">Current Location</h4>
-                    {userLocation ? (
-                      <div className="text-sm text-black/80">
-                        <p>Latitude: {userLocation.latitude.toFixed(6)}</p>
-                        <p>Longitude: {userLocation.longitude.toFixed(6)}</p>
-                        <p className="mt-1 text-xs text-black/60">Address: {currentAddress || "Loading address..."}</p>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-red-400">Location not available</p>
-                    )}
-                  </div>
-
-                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                    <h4 className="text-black font-semibold mb-2">Location Updates</h4>
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => userLocation && handleLocationUpdate(userLocation.latitude, userLocation.longitude)}
-                        disabled={locationUpdateLoading || !userLocation}
-                        className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
-                      >
-                        {locationUpdateLoading ? 'Updating...' : 'Update Location Now'}
-                      </button>
-
-                      <button
-                        onClick={toggleAutoLocationUpdate}
-                        disabled={!userLocation}
-                        className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${autoLocationUpdate
-                          ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                          : 'bg-green-600 hover:bg-green-700 text-white'
-                        }`}
-                      >
-                        {autoLocationUpdate ? 'Stop Auto Updates' : 'Start Auto Updates'}
-                      </button>
-                    </div>
-                    {appointment && (
-                      <div className="mt-3 text-xs text-black/80">
-                        <div className="font-semibold">Appointment Address:</div>
-                        <div>{appointmentAddress || "Loading address..."}</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {locationUpdateMessage && (
-                  <motion.div
-                    className={`mt-4 p-3 rounded-lg text-sm border ${locationUpdateMessage.includes('success')
-                        ? 'bg-green-500/20 text-green-700 border-green-500/30'
-                        : 'bg-red-500/20 text-red-700 border-red-500/30'
-                      }`}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                  >
-                    {locationUpdateMessage}
-                  </motion.div>
-                )}
-              </motion.div>
 
 
 
               {error && <div className="mb-4 p-3 rounded-md bg-red-100 text-red-700 border border-red-200 w-full text-center">{error}</div>}
               {loading && <div className="mb-4 text-blue-600 text-center">Loading...</div>}
 
-              {appointment && userLocation ? (
-                <motion.div className="w-full mb-6 rounded-xl shadow-sm border border-gray-200 p-6" variants={itemVariants} style={{ backgroundColor: 'var(--neutral-bg-card)' }}>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                    <MdLocationOn className="text-xl text-red-600" />
-                    Current Assignment
-                  </h3>
-                  {/* Google Map container */}
-                  <div
-                    ref={googleMapRef}
-                    className="w-full h-80 rounded-lg shadow border mb-4 relative"
-                    style={{ background: "#E6ECE8" }}
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-gray-50 border-l-4 border-gray-300 p-4 rounded-lg">
-                      <div className="font-semibold text-gray-800 mb-1">Appointment Location:</div>
-                      <div className="font-mono text-base text-gray-700">{appointment.latitude}, {appointment.longitude}</div>
+              {/* Dashboard Layout: Map (left), Location (right), Recent EN_ROUTE booking */}
+              <motion.div className="w-full mb-6 rounded-xl shadow-sm border border-gray-200 p-6" variants={itemVariants} style={{ backgroundColor: 'var(--neutral-bg-card)' }}>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <MdLocationOn className="text-xl text-blue-600" />
+                  Dashboard Overview
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left: Google Map */}
+                  <div className="bg-gray-50 rounded-lg shadow p-4 flex flex-col items-center justify-center">
+                    <div className="font-semibold text-gray-800 mb-2">Map View</div>
+                    <div
+                      ref={googleMapRef}
+                      className="w-full h-80 rounded-lg shadow border relative"
+                      style={{ background: "#E6ECE8" }}
+                    />
+                    {userLocation && appointment && (
+                      <a
+                        href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${appointment.latitude},${appointment.longitude}&travelmode=driving`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-4 inline-block bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200 shadow"
+                      >
+                        Navigate in Google Maps
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Right: Current Location & Recent Booking */}
+                  <div className="flex flex-col gap-6">
+                    <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                      <h4 className="text-black font-semibold mb-2">Current Location</h4>
+                      {userLocation ? (
+                        <div className="text-sm text-black/80">
+                          <p>Latitude: {userLocation.latitude.toFixed(6)}</p>
+                          <p>Longitude: {userLocation.longitude.toFixed(6)}</p>
+                          <p className="mt-1 text-xs text-black/60">Address: {currentAddress || "Loading address..."}</p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-red-400">Location not available</p>
+                      )}
                     </div>
-                    <div className="bg-gray-50 border-l-4 border-gray-300 p-4 rounded-lg">
-                      <div className="font-semibold text-gray-800 mb-1">Your Location:</div>
-                      <div className="font-mono text-base text-gray-700">{userLocation.latitude.toFixed(4)}, {userLocation.longitude.toFixed(4)}</div>
+
+                    {/* Recent EN_ROUTE Booking from History */}
+                    <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                      <h4 className="text-black font-semibold mb-2">Recent Booking (EN_ROUTE)</h4>
+                      {history && history.length > 0 ? (
+                        (() => {
+                          const recentEnRoute = history.find(h => h.status === 'EN_ROUTE');
+                          if (recentEnRoute) {
+                            return (
+                              <div className="text-sm text-black/80">
+                                <p><span className="font-semibold">ID:</span> {recentEnRoute.id}</p>
+                                <p><span className="font-semibold">User ID:</span> {recentEnRoute.userId}</p>
+                                <p><span className="font-semibold">Email:</span> {recentEnRoute.emailOfRequester}</p>
+                                <p><span className="font-semibold">Requested At:</span> {new Date(recentEnRoute.requestedAt).toLocaleString('en-US', {
+                                  year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                })}</p>
+                                <p><span className="font-semibold">Location:</span> {recentEnRoute.latitude?.toFixed(4)}, {recentEnRoute.longitude?.toFixed(4)}</p>
+                                <p><span className="font-semibold">Status:</span> <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">{recentEnRoute.status}</span></p>
+                              </div>
+                            );
+                          } else {
+                            return <p className="text-sm text-gray-500">No EN_ROUTE bookings found.</p>;
+                          }
+                        })()
+                      ) : (
+                        <p className="text-sm text-gray-500">No booking history found.</p>
+                      )}
                     </div>
                   </div>
-                  <div className="mt-4 flex flex-col items-center gap-2">
-                    <a
-                      href={`https://www.google.com/maps/dir/${userLocation.latitude},${userLocation.longitude}/${appointment.latitude},${appointment.longitude}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block bg-red-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-red-700 transition-colors duration-200 shadow"
-                    >
-                      Navigate in Google Maps
-                    </a>
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  className="w-full mb-6 bg-gray-100 p-6 rounded-xl shadow border border-gray-200 text-gray-700 text-center"
-                  variants={itemVariants}
-                >
-                  No active assignment at the moment. Please wait for new requests.
-                </motion.div>
-              )}
+                </div>
+              </motion.div>
 
               {appointment && !completed ? (
                 <div className="flex flex-col items-center w-full relative h-32">
@@ -845,58 +848,58 @@ export default function FireTruckDriverPage() {
                         style={{ accentColor: '#2563eb' }}
                       />
                       {/* Custom thumb with arrow */}
-  <style>{`
-    input[type='range']::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: #2563eb;
-      box-shadow: 0 2px 8px rgba(37,99,235,0.15);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s;
-      position: relative;
-    }
-    input[type='range']:focus::-webkit-slider-thumb {
-      outline: 2px solid #2563eb;
-    }
-    input[type='range']::-webkit-slider-thumb::before {
-      content: '';
-      display: block;
-      position: absolute;
-      left: 8px;
-      top: 7px;
-      width: 0;
-      height: 0;
-      border-top: 7px solid transparent;
-      border-bottom: 7px solid transparent;
-      border-left: 12px solid #fff;
-    }
-    input[type='range']::-webkit-slider-thumb::after {
-      display: none;
-    }
-    input[type='range']::-moz-range-thumb {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: #2563eb;
-      box-shadow: 0 2px 8px rgba(37,99,235,0.15);
-      border: none;
-      position: relative;
-    }
-    input[type='range']:focus::-moz-range-thumb {
-      outline: 2px solid #2563eb;
-    }
-    input[type='range']::-moz-range-thumb {
-      background: #2563eb url('data:image/svg+xml;utf8,<svg width="18" height="18" xmlns="http://www.w3.org/2000/svg"><polygon points="6,3 16,9 6,15" fill="white"/></svg>') no-repeat center center;
-      background-size: 18px 18px;
-    }
-    /* Hide the default arrow for Firefox */
-    input[type='range']::-moz-focus-outer { border: 0; }
-  `}</style>
+                      <style>{`
+  input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #2563eb;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    position: relative;
+  }
+  input[type='range']:focus::-webkit-slider-thumb {
+    outline: 2px solid #2563eb;
+  }
+  input[type='range']::-webkit-slider-thumb::before {
+    content: '';
+    display: block;
+    position: absolute;
+    left: 8px;
+    top: 7px;
+    width: 0;
+    height: 0;
+    border-top: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+    border-left: 12px solid #fff;
+  }
+  input[type='range']::-webkit-slider-thumb::after {
+    display: none;
+  }
+  input[type='range']::-moz-range-thumb {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #2563eb;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.15);
+    border: none;
+    position: relative;
+  }
+  input[type='range']:focus::-moz-range-thumb {
+    outline: 2px solid #2563eb;
+  }
+  input[type='range']::-moz-range-thumb {
+    background: #2563eb url('data:image/svg+xml;utf8,<svg width="18" height="18" xmlns="http://www.w3.org/2000/svg"><polygon points="6,3 16,9 6,15" fill="white"/></svg>') no-repeat center center;
+    background-size: 18px 18px;
+  }
+  /* Hide the default arrow for Firefox */
+  input[type='range']::-moz-focus-outer { border: 0; }
+`}</style>
                       <div className="flex justify-between w-full text-xs mt-2">
                         <span>Start</span>
                         <span>End</span>
@@ -933,7 +936,80 @@ export default function FireTruckDriverPage() {
                   Booking marked as completed! Ready for next assignment.
                 </motion.div>
               )}
+
+              <motion.div
+                className="w-full mb-6 rounded-xl shadow-sm border border-gray-200 p-6"
+                variants={itemVariants}
+                onMouseEnter={handleCursorEnter}
+                onMouseLeave={handleCursorLeave}
+              >
+                <h3 className="text-lg font-semibold text-black mb-4 flex items-center gap-2">
+                  <MdLocationOn className="text-xl text-blue-400" />
+                  Location Management
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                    <h4 className="text-black font-semibold mb-2">Current Location</h4>
+                    {userLocation ? (
+                      <div className="text-sm text-black/80">
+                        <p>Latitude: {userLocation.latitude.toFixed(6)}</p>
+                        <p>Longitude: {userLocation.longitude.toFixed(6)}</p>
+                        <p className="mt-1 text-xs text-black/60">Address: {currentAddress || "Loading address..."}</p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-red-400">Location not available</p>
+                    )}
+                  </div>
+
+                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                    <h4 className="text-black font-semibold mb-2">Location Updates</h4>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => userLocation && handleLocationUpdate(userLocation.latitude, userLocation.longitude)}
+                        disabled={locationUpdateLoading || !userLocation}
+                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                      >
+                        {locationUpdateLoading ? 'Updating...' : 'Update Location Now'}
+                      </button>
+
+                      <button
+                        onClick={toggleAutoLocationUpdate}
+                        disabled={!userLocation}
+                        className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${autoLocationUpdate
+                          ? 'bg-red-600 hover:bg-red-700 text-white'
+                          : 'bg-green-600 hover:bg-green-700 text-white'
+                          }`}
+                      >
+                        {autoLocationUpdate ? 'Stop Auto Updates' : 'Start Auto Updates'}
+                      </button>
+                    </div>
+                    {appointment && (
+                      <div className="mt-3 text-xs text-black/80">
+                        <div className="font-semibold">Appointment Address:</div>
+                        <div>{appointmentAddress || "Loading address..."}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {locationUpdateMessage && (
+                  <motion.div
+                    className={`mt-4 p-3 rounded-lg text-sm border ${locationUpdateMessage.includes('success')
+                      ? 'bg-green-500/20 text-green-300 border-green-500/30'
+                      : 'bg-red-500/20 text-red-300 border-red-500/30'
+                      }`}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    {locationUpdateMessage}
+                  </motion.div>
+                )}
+              </motion.div>
             </motion.div>
+
+
+
           )}
           {activePage === 'history' && (
             <motion.div className="bg-white rounded-xl shadow p-6" variants={containerVariants} initial="hidden" animate="visible">
@@ -1011,12 +1087,12 @@ export default function FireTruckDriverPage() {
                               </td>
                               <td className="px-4 py-3">
                                 <span className={`px-2 py-1 rounded-full text-xs font-semibold ${h.status === 'COMPLETED'
-                                    ? 'bg-green-100 text-green-800'
-                                    : h.status === 'EN_ROUTE'
-                                      ? 'bg-blue-100 text-blue-800'
-                                      : h.status === 'CANCELLED'
-                                        ? 'bg-red-100 text-red-800'
-                                        : 'bg-gray-100 text-gray-800'
+                                  ? 'bg-green-100 text-green-800'
+                                  : h.status === 'EN_ROUTE'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : h.status === 'CANCELLED'
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-gray-100 text-gray-800'
                                   }`}>
                                   {h.status}
                                 </span>
