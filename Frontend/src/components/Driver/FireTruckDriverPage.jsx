@@ -4,8 +4,9 @@ import { MdLocationOn } from 'react-icons/md';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { UserIcon, HomeIcon, ClockIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import { UserIcon, HomeIcon, ClockIcon } from '@heroicons/react/24/outline';
 import reactLogo from '../../assets/react-logo.png';
+import fireDriverImg from '../../assets/fireDriver.png';
 // IMPORTANT: Replace with your actual Google Maps API Key and consider environment variables
 const Maps_API_KEY = 'AIzaSyCnwJl8uyVjTS8ql060q5d0az43nvVsyUw'; // <<<--- Replace this
 
@@ -649,10 +650,13 @@ export default function FireTruckDriverPage() {
 
             {/* Profile Image */}
             <img
-              src={profile.avatar}
+              src={fireDriverImg}
               alt="Admin"
               className="h-10 w-10 rounded-full object-cover border-2 border-white shadow"
+
+              onClick={() => setActivePage('profile')}
             />
+
 
             {/* Icon Actions */}
             <div className="flex items-center gap-2">
@@ -1126,7 +1130,7 @@ export default function FireTruckDriverPage() {
 
               {!profileLoading && !profileError && (
                 <div className="flex flex-col items-center gap-4">
-                  <img src={profile.avatar} alt="avatar" className="w-24 h-24 rounded-full border-2 border-blue-400 shadow-md" />
+                  <img src={fireDriverImg} alt="avatar" className="w-24 h-24 rounded-full border-2 border-blue-400 shadow-md" />
                   <div className="font-bold text-lg text-black">{profile.name}</div>
 
                   <div className="w-full space-y-3">

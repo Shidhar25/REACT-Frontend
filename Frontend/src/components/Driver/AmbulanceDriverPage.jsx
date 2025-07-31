@@ -4,7 +4,7 @@ import { MdAccessTime, MdCloud, MdAssignment, MdLocalHospital, MdLocationOn } fr
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-
+import AmbulanceDriverImg from '../../assets/ambulanceDriver.png';
 import { UserIcon, HomeIcon, ClockIcon, MapIcon as MapOutlineIcon } from '@heroicons/react/24/outline';
 
 import reactLogo from '../../assets/react-logo.png';
@@ -651,9 +651,10 @@ export default function AmbulanceDriverPage() {
 
             {/* Profile Image */}
             <img
-              src={profile.avatar}
+              src={AmbulanceDriverImg}
               alt="Admin"
               className="h-10 w-10 rounded-full object-cover border-2 border-white shadow"
+              onClick={() => setActivePage('profile')}
             />
 
             {/* Icon Actions */}
@@ -1131,7 +1132,7 @@ export default function AmbulanceDriverPage() {
 
               {!profileLoading && !profileError && (
                 <div className="flex flex-col items-center gap-4">
-                  <img src={profile.avatar} alt="avatar" className="w-24 h-24 rounded-full border-2 border-blue-400 shadow-md" />
+                  <img src={AmbulanceDriverImg} alt="avatar" className="w-24 h-24 rounded-full border-2 border-blue-400 shadow-md" />
                   <div className="font-bold text-lg text-black">{profile.name}</div>
 
                   <div className="w-full space-y-3">
