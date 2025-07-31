@@ -181,7 +181,7 @@ export default function AmbulanceDriverPage() {
     }
   };
 
-  // Fetch history from API
+  // Fetch history from API and then fetch booking details for EN_ROUTE
   const fetchHistory = async () => {
     console.log('Fetching history from API...');
     console.log('JWT token:', localStorage.getItem('jwt') || localStorage.getItem('token'));
@@ -209,9 +209,37 @@ export default function AmbulanceDriverPage() {
       if (response.ok) {
         const historyData = await response.json();
         console.log('History data received:', historyData);
-
         setHistory(historyData);
         toast.success('History updated successfully!');
+
+        // Find the most recent EN_ROUTE booking
+        const recentEnRoute = historyData.find(h => h.status === 'EN_ROUTE');
+        if (recentEnRoute && recentEnRoute.id) {
+          // Fetch booking details using the id
+          try {
+            const bookingRes = await fetch(`http://localhost:8080/user/booking/${recentEnRoute.id}`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            if (bookingRes.ok) {
+              const bookingData = await bookingRes.json();
+              // If bookingData.assignedAmbulances exists, set userLocation to the first ambulance's location
+              if (bookingData.assignedAmbulances && bookingData.assignedAmbulances.length > 0) {
+                const ambulance = bookingData.assignedAmbulances[0];
+                setUserLocation({ latitude: ambulance.latitude, longitude: ambulance.longitude });
+                toast.info('Ambulance driver location updated from booking data.');
+              }
+            } else {
+              const bookingError = await bookingRes.json();
+              toast.error(bookingError.message || 'Failed to fetch booking details');
+            }
+          } catch (err) {
+            toast.error('Network error while fetching booking details.');
+          }
+        }
       } else {
         const errorData = await response.json();
         setHistoryError(errorData.message || 'Failed to fetch history');
@@ -295,24 +323,22 @@ export default function AmbulanceDriverPage() {
     fetchAppointment();
   }, []);
 
-  useEffect(() => {
+  // Only get location when Update Location button is clicked
+  const getCurrentLocation = () => {
     if (!navigator.geolocation) {
       setError('Geolocation is not supported by your browser.');
       toast.error('Geolocation is not supported by your browser.');
       return;
     }
-    const watchId = navigator.geolocation.watchPosition(
+    navigator.geolocation.getCurrentPosition(
       (pos) => {
         const newLocation = {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude
         };
         setUserLocation(newLocation);
-
-        // Auto-update location if enabled
-        if (autoLocationUpdate) {
-          handleLocationUpdate(newLocation.latitude, newLocation.longitude);
-        }
+        // Optionally, update location on server immediately
+        handleLocationUpdate(newLocation.latitude, newLocation.longitude);
       },
       (err) => {
         console.error('Geolocation error:', err);
@@ -321,9 +347,7 @@ export default function AmbulanceDriverPage() {
       },
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
-
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [autoLocationUpdate]);
+  };
 
   const handleComplete = async () => {
     setSliderAnimating(false);
@@ -478,7 +502,7 @@ export default function AmbulanceDriverPage() {
     // eslint-disable-next-line
   }, [appointment, userLocation]);
 
-  // Render Google Map
+  // Render Google Map and show distance/time
   function renderGoogleMap() {
     if (!googleMapRef.current || !window.google) return;
 
@@ -526,7 +550,7 @@ export default function AmbulanceDriverPage() {
     bounds.extend({ lat: userLocation.latitude, lng: userLocation.longitude });
     mapInstance.current.fitBounds(bounds);
 
-    // Draw directions (route)
+    // Draw directions (route) and get distance/time
     const directionsService = new window.google.maps.DirectionsService();
     const directionsRenderer = new window.google.maps.DirectionsRenderer({
       map: mapInstance.current,
@@ -547,6 +571,14 @@ export default function AmbulanceDriverPage() {
       (result, status) => {
         if (status === window.google.maps.DirectionsStatus.OK) {
           directionsRenderer.setDirections(result);
+          // Get distance and duration from result
+          if (result.routes && result.routes[0] && result.routes[0].legs && result.routes[0].legs[0]) {
+            const leg = result.routes[0].legs[0];
+            setRouteInfo({
+              distance: leg.distance.text,
+              duration: leg.duration.text
+            });
+          }
         }
       }
     );
@@ -749,7 +781,7 @@ export default function AmbulanceDriverPage() {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Left: Google Map */}
-                  <div className="bg-gray-50 rounded-lg shadow p-4 flex flex-col items-center justify-center">
+                  <div className="bg-gray-50 rounded-xl shadow-lg p-4 flex flex-col items-center justify-center border-2 border-blue-200">
                     <div className="font-semibold text-gray-800 mb-2">Map View</div>
                     <div
                       ref={googleMapRef}
@@ -757,60 +789,86 @@ export default function AmbulanceDriverPage() {
                       style={{ background: "#E6ECE8" }}
                     />
                     {userLocation && appointment && (
-                      <a
-                        href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${appointment.latitude},${appointment.longitude}&travelmode=driving`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-4 inline-block bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200 shadow"
-                      >
-                        Navigate in Google Maps
-                      </a>
+                      <div className="mt-4 flex flex-row items-center justify-between w-full gap-4">
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${appointment.latitude},${appointment.longitude}&travelmode=driving`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200 shadow"
+                          style={{ minWidth: '180px', textAlign: 'center' }}
+                        >
+                          Navigate in Google Maps
+                        </a>
+                        {routeInfo && (
+                          <div className="text-sm text-gray-800 bg-blue-50 rounded-lg px-4 py-2 shadow border border-blue-300 min-w-[180px] text-right">
+                            <div><span className="font-semibold">Distance:</span> {routeInfo.distance}</div>
+                            <div><span className="font-semibold">Estimated Time:</span> {routeInfo.duration}</div>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
 
-                  {/* Right: Current Location & Recent Booking */}
-                  <div className="flex flex-col gap-6">
-                    <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                      <h4 className="text-black font-semibold mb-2">Current Location</h4>
-                      {userLocation ? (
-                        <div className="text-sm text-black/80">
-                          <p>Latitude: {userLocation.latitude.toFixed(6)}</p>
-                          <p>Longitude: {userLocation.longitude.toFixed(6)}</p>
-                          <p className="mt-1 text-xs text-black/60">Address: {currentAddress || "Loading address..."}</p>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-red-400">Location not available</p>
-                      )}
-                    </div>
+{/* Right: Current Location & Recent Booking */}
+<div className="flex flex-col gap-6 bg-white">
 
-                    {/* Recent EN_ROUTE Booking from History */}
-                    <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                      <h4 className="text-black font-semibold mb-2">Recent Booking (EN_ROUTE)</h4>
-                      {history && history.length > 0 ? (
-                        (() => {
-                          const recentEnRoute = history.find(h => h.status === 'EN_ROUTE');
-                          if (recentEnRoute) {
-                            return (
-                              <div className="text-sm text-black/80">
-                                <p><span className="font-semibold">ID:</span> {recentEnRoute.id}</p>
-                                <p><span className="font-semibold">User ID:</span> {recentEnRoute.userId}</p>
-                                <p><span className="font-semibold">Email:</span> {recentEnRoute.emailOfRequester}</p>
-                                <p><span className="font-semibold">Requested At:</span> {new Date(recentEnRoute.requestedAt).toLocaleString('en-US', {
-                                  year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                                })}</p>
-                                <p><span className="font-semibold">Location:</span> {recentEnRoute.latitude?.toFixed(4)}, {recentEnRoute.longitude?.toFixed(4)}</p>
-                                <p><span className="font-semibold">Status:</span> <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">{recentEnRoute.status}</span></p>
-                              </div>
-                            );
-                          } else {
-                            return <p className="text-sm text-gray-500">No EN_ROUTE bookings found.</p>;
-                          }
-                        })()
-                      ) : (
-                        <p className="text-sm text-gray-500">No booking history found.</p>
-                      )}
-                    </div>
-                  </div>
+  {/* Current Location */}
+  <div className="rounded-xl shadow-lg p-4 bg-green-50">
+    <h4 className="text-green-700 font-bold mb-2 flex items-center gap-2">
+      <MdLocationOn className="text-xl text-green-500" />Current Location
+    </h4>
+    {userLocation ? (
+      <div className="text-base text-black/90 space-y-1">
+        <div className="flex gap-2">
+          <span className="font-semibold text-green-700">Latitude:</span>
+          <span>{userLocation.latitude.toFixed(6)}</span>
+        </div>
+        <div className="flex gap-2">
+          <span className="font-semibold text-green-700">Longitude:</span>
+          <span>{userLocation.longitude.toFixed(6)}</span>
+        </div>
+        <div className="flex gap-2">
+          <span className="font-semibold text-green-700">Address:</span>
+          <span>{currentAddress || "Loading address..."}</span>
+        </div>
+      </div>
+    ) : (
+      <p className="text-base text-red-400">Location not available</p>
+    )}
+  </div>
+
+  {/* Recent EN_ROUTE Booking from History */}
+  <div className="rounded-xl shadow-lg p-4 bg-red-50">
+    <h4 className="text-red-700 font-bold mb-2 flex items-center gap-2">
+      <MdAssignment className="text-xl text-red-500" />Recent Booking (EN_ROUTE)
+    </h4>
+    {history && history.length > 0 ? (
+      (() => {
+        const recentEnRoute = history.find(h => h.status === 'EN_ROUTE');
+        if (recentEnRoute) {
+          return (
+            <div className="text-base text-black/90 space-y-1">
+              <div className="flex gap-2"><span className="font-semibold text-red-700">ID:</span> <span>{recentEnRoute.id}</span></div>
+              <div className="flex gap-2"><span className="font-semibold text-red-700">User ID:</span> <span>{recentEnRoute.userId}</span></div>
+              <div className="flex gap-2"><span className="font-semibold text-red-700">Email:</span> <span>{recentEnRoute.emailOfRequester}</span></div>
+              <div className="flex gap-2"><span className="font-semibold text-red-700">Requested At:</span> <span>{new Date(recentEnRoute.requestedAt).toLocaleString('en-US', {
+                year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+              })}</span></div>
+              <div className="flex gap-2"><span className="font-semibold text-red-700">Location:</span> <span>{recentEnRoute.latitude?.toFixed(4)}, {recentEnRoute.longitude?.toFixed(4)}</span></div>
+              <div className="flex gap-2"><span className="font-semibold text-red-700">Status:</span> <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">{recentEnRoute.status}</span></div>
+            </div>
+          );
+        } else {
+          return <p className="text-base text-gray-500">No EN_ROUTE bookings found.</p>;
+        }
+      })()
+    ) : (
+      <p className="text-base text-gray-500">No booking history found.</p>
+    )}
+  </div>
+
+</div>
+
                 </div>
               </motion.div>
 
@@ -952,26 +1010,26 @@ export default function AmbulanceDriverPage() {
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                    <h4 className="text-black font-semibold mb-2">Current Location</h4>
+                  <div className="bg-white rounded-xl border-2 border-white-400 shadow-lg p-4">
+                    <h4 className="text-blue-700 font-bold mb-2 flex items-center gap-2"><MdLocationOn className="text-xl text-blue-500" />Current Location</h4>
                     {userLocation ? (
-                      <div className="text-sm text-black/80">
-                        <p>Latitude: {userLocation.latitude.toFixed(6)}</p>
-                        <p>Longitude: {userLocation.longitude.toFixed(6)}</p>
-                        <p className="mt-1 text-xs text-black/60">Address: {currentAddress || "Loading address..."}</p>
+                      <div className="text-base text-black/90 space-y-1">
+                        <div className="flex gap-2"><span className="font-semibold text-blue-700">Latitude:</span> <span>{userLocation.latitude.toFixed(6)}</span></div>
+                        <div className="flex gap-2"><span className="font-semibold text-blue-700">Longitude:</span> <span>{userLocation.longitude.toFixed(6)}</span></div>
+                        <div className="flex gap-2"><span className="font-semibold text-blue-700">Address:</span> <span>{currentAddress || "Loading address..."}</span></div>
                       </div>
                     ) : (
-                      <p className="text-sm text-red-400">Location not available</p>
+                      <p className="text-base text-red-400">Location not available</p>
                     )}
                   </div>
 
-                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                    <h4 className="text-black font-semibold mb-2">Location Updates</h4>
+                  <div className="bg-white rounded-xl border-2 border-white-400 shadow-lg p-4">
+                    <h4 className="text-purple-700 font-bold mb-2 flex items-center gap-2"><MdCloud className="text-xl text-purple-500" />Location Updates</h4>
                     <div className="space-y-2">
                       <button
-                        onClick={() => userLocation && handleLocationUpdate(userLocation.latitude, userLocation.longitude)}
-                        disabled={locationUpdateLoading || !userLocation}
-                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                        onClick={getCurrentLocation}
+                        disabled={locationUpdateLoading}
+                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-3 py-2 rounded-lg text-base font-semibold transition-colors duration-200"
                       >
                         {locationUpdateLoading ? 'Updating...' : 'Update Location Now'}
                       </button>
@@ -979,7 +1037,7 @@ export default function AmbulanceDriverPage() {
                       <button
                         onClick={toggleAutoLocationUpdate}
                         disabled={!userLocation}
-                        className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${autoLocationUpdate
+                        className={`w-full px-3 py-2 rounded-lg text-base font-semibold transition-colors duration-200 ${autoLocationUpdate
                             ? 'bg-red-600 hover:bg-red-700 text-white'
                             : 'bg-green-600 hover:bg-green-700 text-white'
                           }`}
@@ -988,8 +1046,8 @@ export default function AmbulanceDriverPage() {
                       </button>
                     </div>
                     {appointment && (
-                      <div className="mt-3 text-xs text-black/80">
-                        <div className="font-semibold">Appointment Address:</div>
+                      <div className="mt-3 text-base text-black/90">
+                        <div className="font-semibold text-purple-700">Appointment Address:</div>
                         <div>{appointmentAddress || "Loading address..."}</div>
                       </div>
                     )}

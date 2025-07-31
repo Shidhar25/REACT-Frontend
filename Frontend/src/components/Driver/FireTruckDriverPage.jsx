@@ -74,6 +74,11 @@ const completionOverlayVariants = {
 export default function FireTruckDriverPage() {
   const [appointment, setAppointment] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
+  const [fireDriverLocation, setFireDriverLocation] = useState(null);
+  const [bookingNotes, setBookingNotes] = useState('');
+  const [bookingIssueType, setBookingIssueType] = useState('');
+  const [fireTruckDistance, setFireTruckDistance] = useState(null);
+  const [fireTruckDuration, setFireTruckDuration] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [completed, setCompleted] = useState(false);
@@ -98,6 +103,8 @@ export default function FireTruckDriverPage() {
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  const [bookingDetailsLoading, setBookingDetailsLoading] = useState(false);
+  const [bookingDetailsError, setBookingDetailsError] = useState('');
 
   // Custom animated cursor
   const cursorX = useMotionValue(-100);
@@ -115,14 +122,10 @@ export default function FireTruckDriverPage() {
   const [currentAddress, setCurrentAddress] = useState('');
   const [appointmentAddress, setAppointmentAddress] = useState('');
 
-  // Fetch profile from API
+  // Fetch profile from API and then booking history using fireTruckLicence
   const fetchProfile = async () => {
-    console.log('Fetching profile from API...');
-    console.log('JWT token:', localStorage.getItem('jwt') || localStorage.getItem('token'));
-
     setProfileLoading(true);
     setProfileError('');
-
     try {
       const token = localStorage.getItem('jwt') || localStorage.getItem('token');
       if (!token) {
@@ -131,7 +134,6 @@ export default function FireTruckDriverPage() {
         setProfileLoading(false);
         return;
       }
-
       const response = await fetch('http://localhost:8080/fire/truck-driver/v1/me', {
         method: 'GET',
         headers: {
@@ -139,11 +141,8 @@ export default function FireTruckDriverPage() {
           'Content-Type': 'application/json'
         }
       });
-
       if (response.ok) {
         const profileData = await response.json();
-        console.log('Profile data received:', profileData);
-
         setProfile({
           id: profileData.userId || profile.id,
           name: profileData.name || profile.name,
@@ -155,15 +154,17 @@ export default function FireTruckDriverPage() {
           role: profileData.role,
           avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(profileData.name || 'User')}&background=1a202c&color=fff&size=128`
         });
-
         toast.success('Profile updated successfully!');
+        // Fetch booking history using fireTruckRegNumber (fireTruckLicence)
+        if (profileData.fireTruckRegNumber) {
+          fetchBookingHistoryByLicence(profileData.fireTruckRegNumber);
+        }
       } else {
         const errorData = await response.json();
         setProfileError(errorData.message || 'Failed to fetch profile');
         toast.error(errorData.message || 'Failed to fetch profile');
       }
     } catch (err) {
-      console.error('Error fetching profile:', err);
       setProfileError('Network error. Please try again.');
       toast.error('Network error. Please try again.');
     } finally {
@@ -171,8 +172,8 @@ export default function FireTruckDriverPage() {
     }
   };
 
-  // Fetch booking history from API
-  const fetchHistory = async () => {
+  // Fetch booking history by fireTruckLicence and set latest booking location
+  const fetchBookingHistoryByLicence = async (fireTruckLicence) => {
     setHistoryLoading(true);
     setHistoryError('');
     try {
@@ -183,24 +184,27 @@ export default function FireTruckDriverPage() {
         setHistoryLoading(false);
         return;
       }
-
-      const res = await fetch('http://localhost:8080/fire/truck-driver/v1/history', {
+      const res = await fetch(`http://localhost:8080/fire/truck-driver/v1/get-History/${fireTruckLicence}`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-
       if (res.ok) {
         const data = await res.json();
-        // Assuming data is an array of history items
         setHistory(data);
         toast.success('Booking history loaded successfully!');
+        // Set latest booking location as fire truck location
+        if (data && Array.isArray(data) && data.length > 0) {
+          const latestBooking = data[0];
+          if (latestBooking && latestBooking.latitude && latestBooking.longitude) {
+            setFireDriverLocation({ latitude: latestBooking.latitude, longitude: latestBooking.longitude });
+          }
+        }
       } else {
         const errorData = await res.json();
         setHistoryError(errorData.message || 'Failed to fetch booking history.');
         toast.error(errorData.message || 'Failed to fetch booking history.');
       }
     } catch (err) {
-      console.error('Error fetching history:', err);
       setHistoryError('Network error. Please try again.');
       toast.error('Network error. Please try again.');
     } finally {
@@ -208,12 +212,75 @@ export default function FireTruckDriverPage() {
     }
   };
 
+
+  // Fetch booking details by id and set fire driver location
+  const fetchBookingDetails = async (id) => {
+    setBookingDetailsLoading(true);
+    setBookingDetailsError('');
+    try {
+      const token = localStorage.getItem('jwt') || localStorage.getItem('token');
+      if (!token) {
+        setBookingDetailsError('Authentication token not found. Please login again.');
+        toast.error('Authentication token not found. Please login again.');
+        setBookingDetailsLoading(false);
+        return;
+      }
+      const res = await fetch(`http://localhost:8080/user/booking/${id}`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const booking = await res.json();
+        // Show notes and issue type
+        setBookingNotes(booking.notes || '');
+        setBookingIssueType(booking.issueType || '');
+        // Set fire driver location from booking
+        if (booking && booking.assignedFireTrucks && Array.isArray(booking.assignedFireTrucks)) {
+          const truck = booking.assignedFireTrucks.find(truck => truck.status === 'EN_ROUTE');
+          if (truck) {
+            setFireDriverLocation({ latitude: truck.latitude, longitude: truck.longitude });
+            // Calculate time and distance using Google Maps Distance Matrix API
+            if (booking.latitude && booking.longitude) {
+              getDistanceAndDuration(truck.latitude, truck.longitude, booking.latitude, booking.longitude);
+            }
+          }
+        }
+      } else {
+        const errorData = await res.json();
+        setBookingDetailsError(errorData.message || 'Failed to fetch booking details.');
+        toast.error(errorData.message || 'Failed to fetch booking details.');
+      }
+    } catch (err) {
+      setBookingDetailsError('Network error. Please try again.');
+      toast.error('Network error. Please try again.');
+    } finally {
+      setBookingDetailsLoading(false);
+    }
+  };
+
+  // Get time and distance using Google Maps Distance Matrix API
+  const getDistanceAndDuration = (originLat, originLng, destLat, destLng) => {
+    if (!window.google || !window.google.maps) return;
+    const service = new window.google.maps.DistanceMatrixService();
+    service.getDistanceMatrix({
+      origins: [{ lat: originLat, lng: originLng }],
+      destinations: [{ lat: destLat, lng: destLng }],
+      travelMode: window.google.maps.TravelMode.DRIVING,
+    }, (response, status) => {
+      if (status === 'OK') {
+        const result = response.rows[0].elements[0];
+        setFireTruckDistance(result.distance ? result.distance.text : null);
+        setFireTruckDuration(result.duration ? result.duration.text : null);
+      } else {
+        setFireTruckDistance(null);
+        setFireTruckDuration(null);
+      }
+    });
+  };
+
   useEffect(() => {
-
     fetchProfile();
-
-
-    fetchHistory();
+    // fetchHistory(); // Now handled by fetchProfile after profile fetch
   }, []);
 
 
@@ -280,29 +347,34 @@ export default function FireTruckDriverPage() {
     fetchAppointment();
   }, []);
 
+  // Use fireDriverLocation as current location if available
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setError('Geolocation is not supported by your browser.');
-      toast.error('Geolocation is not supported by your browser.');
-      return;
-    }
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        setUserLocation({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude
-        });
-      },
-      (err) => {
-        console.error('Geolocation error:', err);
-        setError(`Geolocation error: ${err.message}. Please enable location services.`);
-        toast.error(`Geolocation error: ${err.message}`);
-      },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-    );
+    if (fireDriverLocation) {
+      setUserLocation(fireDriverLocation);
+    } else {
+      if (!navigator.geolocation) {
+        setError('Geolocation is not supported by your browser.');
+        toast.error('Geolocation is not supported by your browser.');
+        return;
+      }
+      const watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          setUserLocation({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude
+          });
+        },
+        (err) => {
+          console.error('Geolocation error:', err);
+          setError(`Geolocation error: ${err.message}. Please enable location services.`);
+          toast.error(`Geolocation error: ${err.message}`);
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
 
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, []);
+      return () => navigator.geolocation.clearWatch(watchId);
+    }
+  }, [fireDriverLocation]);
 
   // Update location with live coordinates
   const handleLocationUpdate = async (latitude, longitude) => {
@@ -772,12 +844,28 @@ export default function FireTruckDriverPage() {
                   {/* Right: Current Location & Recent Booking */}
                   <div className="flex flex-col gap-6">
                     <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                      <h4 className="text-black font-semibold mb-2">Current Location</h4>
-                      {userLocation ? (
+                      <h4 className="text-black font-semibold mb-2">Current Location (Fire Truck)</h4>
+                      {fireDriverLocation ? (
                         <div className="text-sm text-black/80">
-                          <p>Latitude: {userLocation.latitude.toFixed(6)}</p>
-                          <p>Longitude: {userLocation.longitude.toFixed(6)}</p>
+                          <p>Latitude: {fireDriverLocation.latitude?.toFixed(6)}</p>
+                          <p>Longitude: {fireDriverLocation.longitude?.toFixed(6)}</p>
                           <p className="mt-1 text-xs text-black/60">Address: {currentAddress || "Loading address..."}</p>
+                          {fireTruckDistance && fireTruckDuration && (
+                            <div className="mt-2 text-xs text-black/80">
+                              <span className="font-semibold">Distance:</span> {fireTruckDistance}<br />
+                              <span className="font-semibold">Estimated Time:</span> {fireTruckDuration}
+                            </div>
+                          )}
+                          {bookingNotes && (
+                            <div className="mt-2 text-xs text-black/80">
+                              <span className="font-semibold">Notes:</span> {bookingNotes}
+                            </div>
+                          )}
+                          {bookingIssueType && (
+                            <div className="mt-2 text-xs text-black/80">
+                              <span className="font-semibold">Issue Type:</span> {bookingIssueType}
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <p className="text-sm text-red-400">Location not available</p>
@@ -801,6 +889,9 @@ export default function FireTruckDriverPage() {
                                 })}</p>
                                 <p><span className="font-semibold">Location:</span> {recentEnRoute.latitude?.toFixed(4)}, {recentEnRoute.longitude?.toFixed(4)}</p>
                                 <p><span className="font-semibold">Status:</span> <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">{recentEnRoute.status}</span></p>
+                                {profile.fireTruckRegNumber && (
+                                  <p><span className="font-semibold">Fire Truck:</span> {profile.fireTruckRegNumber}</p>
+                                )}
                               </div>
                             );
                           } else {
@@ -1019,15 +1110,7 @@ export default function FireTruckDriverPage() {
             <motion.div className="bg-white rounded-xl shadow p-6" variants={containerVariants} initial="hidden" animate="visible">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-800">Booking History</h2>
-                <button
-                  onClick={fetchHistory}
-                  disabled={historyLoading}
-                  className="bg-blue-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-600 disabled:opacity-50 transition-colors duration-200 shadow-md"
-                  onMouseEnter={handleCursorEnter}
-                  onMouseLeave={handleCursorLeave}
-                >
-                  {historyLoading ? 'Refreshing...' : 'Refresh History'}
-                </button>
+                {/* Removed Refresh History button as /fire/driver/v1/get-history API is deprecated */}
               </div>
 
               {historyError && (

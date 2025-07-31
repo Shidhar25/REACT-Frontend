@@ -3,10 +3,12 @@ package com.REACT.backend.fireService.controller;
 
 import com.REACT.backend.ambulanceService.dto.AmbulanceDriverProfileDto;
 import com.REACT.backend.ambulanceService.dto.LocationUpdateByDriver;
+import com.REACT.backend.booking.dto.BookingDto;
 import com.REACT.backend.common.dto.CompleteAssignmentResponseDto;
 import com.REACT.backend.common.dto.LocationDto;
 import com.REACT.backend.common.util.LoggedUserUtil;
 import com.REACT.backend.fireService.dto.FireTruckDriverProfileDto;
+import com.REACT.backend.fireService.dto.FireTruckHistoryResponseDto;
 import com.REACT.backend.fireService.dto.FireTruckLocationUpdateDto;
 import com.REACT.backend.fireService.service.FireService;
 import com.REACT.backend.fireService.service.impl.FireServiceImpl;
@@ -20,6 +22,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -79,6 +83,13 @@ public class FireTruckDriverController {
 
         return ResponseEntity.ok(fireService.updateLocation(dto));
     }
+
+    @GetMapping("/get-History/{vehicleRegNumber}")
+    public ResponseEntity<List<FireTruckHistoryResponseDto>> getHistory(@PathVariable String vehicleRegNumber) {
+        log.info("Fire Truck function is called");
+        return ResponseEntity.ok(fireService.fireTruckHistory(vehicleRegNumber));
+    }
+
 
 
 
