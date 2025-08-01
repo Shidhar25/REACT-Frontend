@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { FaAmbulance, FaPhoneAlt, FaStar, FaCheckCircle } from 'react-icons/fa';
+import { FaAmbulance, FaPhoneAlt, FaStar, FaCheckCircle, FaSignOutAlt } from 'react-icons/fa';
 import { MdAccessTime, MdCloud, MdAssignment, MdLocalHospital, MdLocationOn } from 'react-icons/md';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 import { ToastContainer, toast } from 'react-toastify';
@@ -608,160 +608,131 @@ export default function AmbulanceDriverPage() {
     </motion.div>
   );
 
+  // Add sidebar state for mobile
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Sidebar menu config
+  const sidebarMenu = [
+    { page: 'dashboard', label: 'Dashboard', icon: <HomeIcon /> },
+    { page: 'history', label: 'Booking History', icon: <ClockIcon /> },
+    { page: 'profile', label: 'Profile', icon: <UserIcon /> },
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col font-inter text-white relative overflow-hidden" style={{ backgroundColor: 'var(--neutral-bg-main)' }}>
-      {/* Inject custom color variables */}
-      <style>
-        {`
-          :root {
-            /* Primary Green Tones */
-            --green-sidebar-accent: #2D4739;
-            --green-header-btn: #3A5543;
-            --green-bg-tint: #E6ECE8;
-            --green-progress: #88A596;
-
-            /* Neutral Tones */
-            --neutral-bg-main: #E8E6E0;
-            --neutral-bg-card: #F7F6F2;
-            --neutral-text-placeholder: #B0B0AC;
-            --neutral-text-header: #333333;
-
-            /* Accent and Alert Colors */
-            --accent-success: #2DA66D;
-            --accent-danger: #D95C5C;
-            --accent-btn-dark: #3A5C47;
-            --accent-avatar-bg: #F3F2EF;
-          }
-        `}
-      </style>
-      {/* Custom Animated Cursor */}
-      <motion.div
-        className="fixed z-[9999] pointer-events-none"
-        style={{
-          left: 0,
-          top: 0,
-          x: cursorXSpring,
-          y: cursorYSpring,
-          translateX: '-50%',
-          translateY: '-50%',
-        }}
-        animate={{
-          scale: cursorVariant === 'hover' ? 1.5 : 1,
-          opacity: cursorVariant === 'hover' ? 0.8 : 0.6,
-        }}
-        transition={{ duration: 0.2 }}
-      >
-        <div className="w-4 h-4 bg-white rounded-full shadow-lg border border-white/30"></div>
-      </motion.div>
-
-      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop={true} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
-
-
-      {/* Custom Admin Navbar */}
-      <div className="border-b border-gray-200">
-        {/* Header Top Bar */}
-        <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
-          {/* Left - Logo */}
-          <div className="flex items-center gap-4">
-            <img
-              src={reactLogo}
-              alt="Logo"
-              className="h-14 w-14 object-contain rounded-xl bg-white p-2 shadow-sm"
-            />
-            <div>
-              <h1 className="text-xl font-semibold text-gray-800">Ambulance Driver</h1>
-            </div>
+    <div className="min-h-screen flex flex-col font-inter text-black relative overflow-hidden" style={{ backgroundColor: 'var(--neutral-bg-main)' }}>
+      {/* Mobile Sidebar Overlay */}
+      <div className={`fixed inset-0 z-50 bg-black/40 transition-opacity duration-300 ${sidebarOpen ? 'block' : 'hidden'} md:hidden`} onClick={() => setSidebarOpen(false)} />
+      <aside className={`fixed top-0 left-0 z-50 h-full w-72 bg-white shadow-lg transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:hidden rounded-r-3xl`}>
+        <div className="flex flex-col h-full">
+          {/* Profile Section */}
+          <div className="flex flex-col items-center py-8 border-b">
+            <img src={profile.avatar || AmbulanceDriverImg} alt="avatar" className="w-20 h-20 rounded-full object-cover border-2 border-blue-400 shadow-md mb-2" />
+            <div className="font-bold text-lg text-black">{profile.name || 'Ambulance Driver'}</div>
+            <div className="text-xs text-gray-500">{profile.role || 'Ambulance Driver'}</div>
           </div>
+          {/* Menu */}
+          <nav className="flex flex-col gap-1 px-4 py-6 flex-1">
+            {sidebarMenu.map((item) => (
+              <button
+                key={item.page}
+                onClick={() => { setActivePage(item.page); setSidebarOpen(false); }}
+                className={`flex items-center gap-3 px-4 py-3 rounded-full text-base font-medium transition-all
+                  ${activePage === item.page ? 'bg-gray-100 text-black font-semibold' : 'hover:bg-gray-50 text-gray-700'}`}
+              >
+                <span className="text-xl">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-4 py-3 rounded-full text-base font-medium text-red-600 hover:bg-red-50 mt-8"
+            >
+              <FaSignOutAlt className="text-xl" />
+              Logout
+            </button>
+          </nav>
+        </div>
+      </aside>
 
+      {/* Top Bar */}
+      <div className="border-b border-gray-200 bg-[#E8E6E0]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+          {/* Hamburger for mobile */}
+          <button className="md:hidden text-2xl" onClick={() => setSidebarOpen(true)}>
+            &#9776;
+          </button>
+          {/* Logo and Title */}
+          <div className="flex items-center gap-4">
+            <img src={reactLogo} alt="Logo" className="h-10 w-10 object-contain rounded-xl bg-white p-2 shadow-sm" />
+            <h1 className="text-lg font-semibold text-gray-800">Ambulance Driver</h1>
+          </div>
           {/* Right - User Info & Actions */}
-          <div className="flex items-center gap-6">
-            {/* User Info */}
-            <div className="text-right">
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden sm:block">
               <p className="text-sm text-gray-600">Welcome {profile.name}</p>
               <p className="text-xs text-gray-400">Updated: {new Date().toLocaleTimeString()}</p>
             </div>
-
-            {/* Profile Image */}
-            <img
-              src={AmbulanceDriverImg}
-              alt="Admin"
-              className="h-10 w-10 rounded-full object-cover border-2 border-white shadow"
-              onClick={() => setActivePage('profile')}
-            />
-
-            {/* Icon Actions */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => window.location.href = '/'}
-                title="Home"
-                className="text-gray-600 hover:text-green-600 transition"
-              >
-                <HomeIcon className="h-6 w-6" />
-              </button>
-              <button
-                onClick={handleLogout}
-                title="Logout"
-                className="text-red-600 hover:text-red-800 transition"
-              >
-                {/* You may need to import ArrowRightOnRectangleIcon or use a similar icon */}
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" /></svg>
-              </button>
-            </div>
+            <img src={AmbulanceDriverImg} alt="Admin" className="h-8 w-8 rounded-full object-cover border-2 border-white shadow" onClick={() => setActivePage('profile')} />
+            <button onClick={handleLogout} title="Logout" className="text-red-600 hover:text-red-800 transition hidden sm:block">
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" /></svg>
+            </button>
           </div>
         </div>
       </div>
 
+      {/* Responsive Navbar */}
+      <div className="w-full max-w-7xl mx-auto">
+        <div className="w-full flex justify-center bg-[#E8E6E0] py-4 sm:py-6">
+          <nav
+            className="bg-[#fef4f4] border border-red-200 rounded-full shadow-lg px-2 sm:px-4 py-2 flex space-x-2 sm:space-x-4 overflow-x-auto max-w-full sm:max-w-3xl"
+            style={{ backgroundColor: '#fff4f4' }}
+          >
+            <motion.button
+              onClick={() => setActivePage('dashboard')}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
+                ${activePage === 'dashboard' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}
+                sm:justify-start`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.97 }}
+              onMouseEnter={handleCursorEnter}
+              onMouseLeave={handleCursorLeave}
+            >
+              <HomeIcon className="h-5 w-5" />
+              <span className="hidden sm:inline">Dashboard</span>
+            </motion.button>
 
-<div className="w-full max-w-7xl mx-auto">
-  {/* Horizontal Navbar - Enhanced Styling */}
-<div className="w-full flex justify-center bg-[#E8E6E0] py-6">
-  <nav
-    className="bg-[#fef4f4] border border-red-200 rounded-full shadow-lg px-4 py-2 flex space-x-4 overflow-x-auto max-w-3xl"
-    style={{ backgroundColor: '#fff4f4' }} // light red/pinkish tone (emergency/safety)
-  >
-    <motion.button
-      onClick={() => setActivePage('dashboard')}
-      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
-        ${activePage === 'dashboard' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}`}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.97 }}
-      onMouseEnter={handleCursorEnter}
-      onMouseLeave={handleCursorLeave}
-    >
-      <HomeIcon className="h-5 w-5" /> Dashboard
-    </motion.button>
+            <motion.button
+              onClick={() => setActivePage('history')}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
+                ${activePage === 'history' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}
+                sm:justify-start`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.97 }}
+              onMouseEnter={handleCursorEnter}
+              onMouseLeave={handleCursorLeave}
+            >
+              <ClockIcon className="h-5 w-5" />
+              <span className="hidden sm:inline">Booking History</span>
+            </motion.button>
 
-    <motion.button
-      onClick={() => setActivePage('history')}
-      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
-        ${activePage === 'history' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}`}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.97 }}
-      onMouseEnter={handleCursorEnter}
-      onMouseLeave={handleCursorLeave}
-    >
-      <ClockIcon className="h-5 w-5" /> Booking History
-    </motion.button>
-
-    <motion.button
-      onClick={() => setActivePage('profile')}
-      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
-        ${activePage === 'profile' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}`}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.97 }}
-      onMouseEnter={handleCursorEnter}
-      onMouseLeave={handleCursorLeave}
-    >
-      <UserIcon className="h-5 w-5" /> Profile
-    </motion.button>
-  </nav>
-</div>
+            <motion.button
+              onClick={() => setActivePage('profile')}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
+                ${activePage === 'profile' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}
+                sm:justify-start`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.97 }}
+              onMouseEnter={handleCursorEnter}
+              onMouseLeave={handleCursorLeave}
+            >
+              <UserIcon className="h-5 w-5" />
+              <span className="hidden sm:inline">Profile</span>
+            </motion.button>
+          </nav>
+        </div>
 
         {/* Main Content */}
-        <main
-          className="flex-1 p-6"
-          // style={{ backgroundColor: 'var(--neutral-bg-card)' }} // Use card/section background from palette
-        >
+        <main className="flex-1 p-2 sm:p-6" style={{ backgroundColor: 'var(--neutral-bg-card)' }}>
           {activePage === 'dashboard' && (
             <motion.div variants={containerVariants} initial="hidden" animate="visible">
 
@@ -1211,7 +1182,7 @@ export default function AmbulanceDriverPage() {
                     {profile.email && (
                       <div className="flex items-center gap-2 text-black/80">
                         <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 012 2h4a2 2 0 012 2v1" />
                         </svg>
                         <span>{profile.email}</span>
                       </div>

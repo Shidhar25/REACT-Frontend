@@ -21,6 +21,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import { ProtectedRoute, PublicRoute } from './components/common/ProtectedRoute';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
+import PoliceOfficerPage from './components/Driver/PoliceOfficerPage.jsx';
 
 function SessionReset() {
   useEffect(() => {
@@ -147,7 +148,7 @@ function App() {
           {/* Police */}
           <Route path="/police-dashboard" element={
             <ProtectedRoute requiredRole="POLICE_OFFICER">
-              <PoliceDashboard />
+              <PoliceOfficerPage/>
             </ProtectedRoute>
           } />
           <Route path="/police-admin-dashboard" element={
