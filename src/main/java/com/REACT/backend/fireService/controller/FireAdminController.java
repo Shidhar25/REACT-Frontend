@@ -1,6 +1,8 @@
 package com.REACT.backend.fireService.controller;
 
 import com.REACT.backend.ambulanceService.dto.AmbulanceDriverProfileDto;
+import com.REACT.backend.booking.dto.BookingDto;
+import com.REACT.backend.booking.dto.BookingRequestDto;
 import com.REACT.backend.fireService.dto.*;
 import com.REACT.backend.fireService.service.FireAdminService;
 import com.REACT.backend.fireService.service.impl.FireServiceImpl;
@@ -40,7 +42,7 @@ public class FireAdminController {
     //  Get booking history of a fire station
     @PreAuthorize("hasAuthority('FIRE_STATION_ADMIN')")
     @GetMapping("/station/{stationId}/history")
-    public ResponseEntity<?> getStationHistory(@Valid @PathVariable Long stationId) {
+    public ResponseEntity<List<BookingDto>> getStationHistory(@Valid @PathVariable Long stationId) {
         log.info("Station History for station {}",stationId);
         return ResponseEntity.ok(fireAdminService.getBookingHistoryByStation(stationId));
     }
@@ -48,7 +50,7 @@ public class FireAdminController {
     // Get booking history of a fire truck
     @GetMapping("/truck/{truckId}/history")
     @PreAuthorize("hasAuthority('FIRE_DRIVER') or hasAuthority('FIRE_STATION_ADMIN')")
-    public ResponseEntity<?> getTruckHistory(@Valid @PathVariable Long truckId) {
+    public ResponseEntity<List<BookingDto>> getTruckHistory(@Valid @PathVariable Long truckId) {
         log.info("Truck history for truck {} requested ",truckId);
         return ResponseEntity.ok(fireAdminService.getBookingHistoryByTruck(truckId));
     }

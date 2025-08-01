@@ -6,6 +6,7 @@ import com.REACT.backend.booking.model.EmergencyRequestStatus;
 import com.REACT.backend.booking.repository.EmergencyRequestRepository;
 import com.REACT.backend.ambulanceService.repository.AmbulanceRepository;
 import com.REACT.backend.fireService.model.FireTruckStatus;
+import com.REACT.backend.fireService.repository.FireStationRepository;
 import com.REACT.backend.fireService.repository.FireTruckRepository;
 import com.REACT.backend.policeService.repository.PoliceStationRepository;
 import com.REACT.backend.hospitalService.repository.HospitalRepository;
@@ -26,6 +27,7 @@ public class DashboardService {
     private final EmergencyRequestRepository emergencyRequestRepository;
     private final AmbulanceRepository ambulanceRepository;
     private final FireTruckRepository fireTruckRepository;
+    private final FireStationRepository fireStationRepository;
     private final PoliceStationRepository policeStationRepository;
     private final HospitalRepository hospitalRepository;
     private final UserRepository userRepository;
@@ -68,7 +70,7 @@ public class DashboardService {
             long availableFireTrucks = Math.max(0, totalFireTrucks - busyFireTrucks);
 
             // Infra stats
-            long totalFireStations = safeRepoCall(() -> fireTruckRepository.countDistinctByFireStationId(), "Fire stations");
+            long totalFireStations = safeRepoCall(() -> fireStationRepository.count(), "Fire stations");
             long totalHospitals = safeRepoCall(() -> hospitalRepository.count(), "Hospitals");
             long totalPoliceOfficers = safeRepoCall(() -> policeStationRepository.countTotalPoliceOfficers(), "Police officers");
             long totalPoliceStations = safeRepoCall(() -> policeStationRepository.count(), "Police stations");

@@ -39,6 +39,8 @@ import { motion } from 'framer-motion';
 import reactLogo from './../../assets/react-logo.png';
 import AmbulanceAdmin from './../../assets/AmbulanceAdmin.avif';
 import { toast } from 'react-toastify';
+import { getAddressFromCoords } from '../../utils/getAddressFromCoords';
+
 
 // Add a simple JWT decode function (if jwt-decode is not available)
 function decodeJWT(token) {
@@ -132,6 +134,10 @@ export default function AmbulanceDashboard() {
     longitude: '',
     status: 'AVAILABLE'
   });
+
+
+  
+const [isEditing, setIsEditing] = useState(false);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetchedLocation, setFetchedLocation] = useState(null);
@@ -166,6 +172,9 @@ export default function AmbulanceDashboard() {
   const [emergencyAddresses, setEmergencyAddresses] = useState({});
   const [hoveredCoords, setHoveredCoords] = useState(null);
   const [hoveredEmergencyId, setHoveredEmergencyId] = useState(null);
+  const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    const [requestingUsers, setRequestingUsers] = useState({});
+
 const hoverTimeout = useRef(null);
   const [profileData, setProfileData] = useState({
   id: '',
@@ -233,30 +242,27 @@ const hoverTimeout = useRef(null);
     handleFetchAllDrivers();
   }
 }, [activeTab]);
+const fetchAddresses = async () => {
+  const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+  const addressMap = {};
 
-useEffect(() => {
-  const controller = new AbortController();
-  const fetchAddresses = async () => {
-    const addressMap = {};
-    await Promise.all(
-      recentEmergencies.map(async (em) => {
-        const key = em.booking_id;
-        try {
-          const address = await getAddressFromCoords(em.pickup_latitude, em.pickup_longitude);
-          addressMap[key] = address;
-        } catch (err) {
-          addressMap[key] = 'Unable to resolve';
-        }
-      })
-    );
-    setEmergencyAddresses(addressMap);
-  };
+  for (const em of recentEmergencies) {
+    const { pickup_latitude: lat, pickup_longitude: lng, booking_id } = em;
 
-  if (recentEmergencies.length > 0) {
-    const timeout = setTimeout(fetchAddresses, 500); // debounce by 500ms
-    return () => clearTimeout(timeout);
+    if (lat && lng) {
+      const address = await getAddressFromCoords(lat, lng, apiKey);
+      addressMap[booking_id] = address;
+    } else {
+      addressMap[booking_id] = 'Missing coordinates';
+    }
   }
-}, [recentEmergencies]);
+
+  setEmergencyAddresses(addressMap); // or whatever state setter you're using
+};
+
+
+
+
 
 
   useEffect(() => {
@@ -310,10 +316,37 @@ useEffect(() => {
           }
           return res.json();
         })
-        .then((data) => {
+        .then(async data => {
           const pendingEmergencies = data.filter(emergency => emergency.status === 'PENDING');
           const completedEmergencies = data.filter(emergency => emergency.status === 'COMPLETED');
+          const allBookings = [...pendingEmergencies, ...completedEmergencies];
           setRecentEmergencies([...pendingEmergencies, ...completedEmergencies]);
+           // 🔥 ADDED: Fetch user metadata
+        const uniqueUserIds = [...new Set(allBookings.map(b => b.requested_by_user_id))];
+        const userMap = {};
+
+        await Promise.all(
+          uniqueUserIds.map(async userId => {
+            try {
+              const res = await fetch(`http://localhost:8080/api/user/${userId}`, {
+                headers: { Authorization: `Bearer ${jwt}` }
+              });
+              if (res.ok) {
+                const userData = await res.json();
+                userMap[userId] = {
+                  name: userData.fullName,
+                  email: userData.email
+                };
+              } else {
+                userMap[userId] = { name: 'Unknown', email: '-' };
+              }
+            } catch (err) {
+              userMap[userId] = { name: 'Error', email: '-' };
+            }
+          })
+        );
+
+        setRequestingUsers(userMap); // ✅ Update the state you declared
         })
         .catch((err) => {
           setEmergenciesError(err.message || 'Could not load recent emergencies.');
@@ -854,11 +887,17 @@ useEffect(() => {
             </div>
 
             {/* Profile Image */}
-            <img
-              src={AmbulanceAdmin}
-              alt="Admin"
-              className="h-10 w-10 rounded-full object-cover border-2 border-white shadow"
-            />
+           <div
+  onClick={() => setActiveTab('profile')}
+  title="Go to Profile"
+  className="cursor-pointer"
+>
+  <img
+    src={AmbulanceAdmin}
+    alt="Admin"
+    className="h-10 w-10 rounded-full object-cover border-2 border-white shadow"
+  />
+</div>
 
             {/* Icon Actions */}
             <div className="flex items-center gap-2">
@@ -943,20 +982,7 @@ useEffect(() => {
                   onClick={() => setActiveTab('emergencies')}
                   bgColorClass="bg-white"
                 />
-                <QuickActionCard
-                  title="Driver Rankings"
-                  description="Analyze performance and efficiency of drivers."
-                  icon={<TrophyIcon className="h-6 w-6" />}
-                  onClick={() => setActiveTab('rankings')}
-                  bgColorClass="bg-white"
-                />
-                <QuickActionCard
-                  title="Profile Management"
-                  description="Manage your ambulance service administrator profile."
-                  icon={<UserCircleIcon className="h-6 w-6" />}
-                  onClick={() => setActiveTab('profile')}
-                  bgColorClass="bg-white"
-                />
+                
                  <QuickActionCard
                   title="Ambulance History"
                   description="View past requests and completed bookings."
@@ -1080,9 +1106,19 @@ useEffect(() => {
                                 {em.pickup_latitude}, {em.pickup_longitude}
                               </div>
                               <div className="text-sm text-gray-500 mt-2">
-                                <ClockIcon className="inline h-4 w-4 mr-1 text-gray-400" />
-                                {new Date(em.created_at).toLocaleString()}
+                              <ClockIcon className="inline h-4 w-4 mr-1 text-gray-400" />
+                              Time :{new Date(em.created_at).toLocaleString()}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-600 mb-1">
+                              <div className="mr-3 flex items-center justify-center h-full">
+                                <UserIcon className="h-6 w-6 text-gray-400" />
                               </div>
+                              <div className="text-left">
+                                <div className="font-medium">Requested by {requestingUsers[em.requested_by_user_id]?.name || 'Loading...'}</div>
+                                <div className="text-xs text-gray-500">{requestingUsers[em.requested_by_user_id]?.email}</div>
+                              </div>
+                            </div>
+
                             </motion.div>
                           ))}
                       </div>
@@ -1121,9 +1157,18 @@ useEffect(() => {
                                 {em.pickup_latitude}, {em.pickup_longitude}
                               </div>
                               <div className="text-sm text-gray-500 mt-2">
-                                <ClockIcon className="inline h-4 w-4 mr-1 text-gray-400" />
-                                {new Date(em.created_at).toLocaleString()}
+                              <ClockIcon className="inline h-4 w-4 mr-1 text-gray-400" />
+                              Time :{new Date(em.created_at).toLocaleString()}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-600 mb-1">
+                              <div className="mr-3 flex items-center justify-center h-full">
+                                <UserIcon className="h-6 w-6 text-gray-400" />
                               </div>
+                              <div className="text-left">
+                                <div className="font-medium">Requested by {requestingUsers[em.requested_by_user_id]?.name || 'Loading...'}</div>
+                                <div className="text-xs text-gray-500">{requestingUsers[em.requested_by_user_id]?.email}</div>
+                              </div>
+                            </div>
                             </motion.div>
                           ))}
                       </div>
@@ -1633,55 +1678,63 @@ useEffect(() => {
                     variants={containerVariants}
                   >
                     <motion.thead className="bg-gray-100" variants={itemVariants}>
-                      <tr>
-                        <th className="px-4 py-3 text-left font-semibold text-gray-700">ID</th>
-                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Issue</th>
-                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
-                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Created At</th>
-                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Phone</th>
-                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Location</th>
-                      </tr>
+                      <tr className="text-left text-gray-800 text-sm uppercase tracking-wide">
+                          <th className="px-4 py-3 border-b">Booking ID</th>
+                          <th className="px-4 py-3 border-b">Issue</th>
+                          <th className="px-4 py-3 border-b">Status</th>
+                          <th className="px-4 py-3 border-b">Created</th>
+                          <th className="px-4 py-3 border-b">Victim Phone</th>
+                          <th className="px-4 py-3 border-b">Requested By</th>
+                          <th className="px-4 py-3 border-b">Pickup Location</th>
+                        </tr>
                     </motion.thead>
                     <motion.tbody className="divide-y divide-gray-200">
-                      {recentEmergencies.map((em) => (
-                        <motion.tr
-                          key={em.booking_id}
-                          className="hover:bg-gray-50 transition-colors duration-150"
-                          variants={itemVariants}
-                          onMouseEnter={() => {
-                            setHoveredCoords({ lat: em.pickup_latitude, lng: em.pickup_longitude });
-                            setHoveredEmergencyId(em.booking_id);
-                          }}
-                          onMouseLeave={() => {
-                            setHoveredCoords(null);
-                            setHoveredEmergencyId(null);
-                          }}
-                        >
-                          <td className="px-4 py-3">{em.booking_id}</td>
-                          <td className="px-4 py-3">{em.issue_type}</td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                                em.status === 'COMPLETED'
-                                  ? 'bg-green-100 text-green-700'
-                                  : 'bg-yellow-100 text-yellow-700'
-                              }`}
+                      {recentEmergencies.map((b) => (
+                          <motion.tr
+                            key={b.booking_id}
+                            className="hover:bg-orange-50/40 transition border-b border-gray-100 last:border-b-0"
+                            variants={itemVariants}
+                          >
+                            <td className="px-4 py-3 text-sm font-medium">{b.booking_id}</td>
+                            <td className="px-4 py-3 text-sm">{b.issue_type}</td>
+                            <td className="px-4 py-3 text-sm">
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  b.status === 'COMPLETED'
+                                    ? 'bg-green-100 text-green-800'
+                                    : b.status === 'PENDING'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}
+                              >
+                                {b.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-gray-500">{new Date(b.created_at).toLocaleString()}</td>
+                            <td className="px-4 py-3 text-sm">{b.victim_phone_number || '-'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700">
+                              {requestingUsers[b.requested_by_user_id]?.name || 'Loading...'}
+                              <div className="text-xs text-gray-400">
+                                {requestingUsers[b.requested_by_user_id]?.email}
+                              </div>
+                            </td>
+                            <td
+                              className="px-4 py-3 text-xs text-blue-600 hover:text-blue-800 cursor-pointer underline"
+                              onMouseEnter={() => {
+                                setHoveredCoords({
+                                  lat: b.pickup_latitude,
+                                  lng: b.pickup_longitude,
+                                });
+                                setHoveredEmergencyId(b.booking_id);
+                              }}
+                              onMouseLeave={() => {
+                                setHoveredCoords(null);
+                                setHoveredEmergencyId(null);
+                              }}
                             >
-                              {em.status === 'COMPLETED' ? (
-                                <CheckCircleIcon className="h-4 w-4" />
-                              ) : (
-                                <ClockIcon className="h-4 w-4" />
-                              )}
-                              {em.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">{new Date(em.created_at).toLocaleString()}</td>
-                          <td className="px-4 py-3">{em.victim_phone_number}</td>
-                          <td className="px-4 py-3 text-blue-600 hover:underline cursor-pointer">
-                            <MapPinIcon className="inline-block h-4 w-4 text-gray-500 mr-1" />
-                            {emergencyAddresses[em.booking_id] || 'Loading...'}
-                          </td>
-                        </motion.tr>
+                              {b.pickup_latitude}, {b.pickup_longitude}
+                            </td>
+                          </motion.tr>
                       ))}
                     </motion.tbody>
                   </motion.table>
@@ -1771,12 +1824,16 @@ useEffect(() => {
                       </div>
                     </div>
 
-                    {/* Button - moved to bottom */}
+                    {/* Button - moved to bottom
                      <div className="flex justify-center mt-6">
-                    <button className="bg-green-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-all shadow-sm">
-                      Edit Profile
-                    </button>
-                  </div>
+                    <button
+                  onClick={() => setIsEditing(true)}
+                  className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-all shadow-sm"
+                >
+                  Edit Profile
+                </button>
+
+                  </div> */}
                   </motion.div>
                 )}
               </div>

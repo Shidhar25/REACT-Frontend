@@ -42,4 +42,7 @@ public interface FireTruckRepository extends JpaRepository<FireTruckEntity, Long
     boolean existsByVehicleRegNumber(String numberPlate);
 
     Optional<FireTruckEntity> findByFireTruckId(Long fireTruckId);
+
+    List<FireTruckEntity> findByFireStationEntity_Id(Long stationId);
+
 }

@@ -20,6 +20,7 @@ public class BookingRequestDto {
     private String notes;
     private Long requestId;
     private Long bookingLogId;
+
 }
 
 

@@ -5,6 +5,7 @@ import reactLogo from './../../assets/react-logo.png';
 import FireAdmin from './../../assets/FireAdmin.png';
 import { toast } from 'react-toastify';
 import {
+  MapIcon,
   FireIcon,
   BuildingOfficeIcon,
   TruckIcon,
@@ -133,6 +134,9 @@ export default function FireDashboard() {
     validateField(name, value);
   };
 
+  const [hoveredCoords, setHoveredCoords] = useState(null);
+const [hoveredEmergencyId, setHoveredEmergencyId] = useState(null);
+
   
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -152,7 +156,7 @@ export default function FireDashboard() {
   password: '',
   licenseNumber: '',
   vehicleRegNumber: '',
-  fireStationId: '',  // instead of hospitalID
+  fireStationId: '',  
   securityQuestion: 'PET_NAME',  // default selection
   securityAnswer: '',
 });
@@ -169,7 +173,7 @@ export default function FireDashboard() {
         securityQuestion: '',
         securityAnswer: ''
   });
-
+const [requestingUsers, setRequestingUsers] = useState({});
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState(null);
   const [reportTruckHistory, setReportTruckHistory] = useState([]);
@@ -227,11 +231,99 @@ export default function FireDashboard() {
 
   const latRegex = /^-?([1-8]?\d(\.\d+)?|90(\.0+)?)$/;
   const lonRegex = /^-?((1?[0-7]?\d(\.\d+)?)|180(\.0+)?)$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const phoneRegex = /^[6-9]\d{9}$/;
+  const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/; // PAN format
+  const licenseRegex = /^[A-Z]{2}-[A-Z]+-\d{4}$/i; // Format: STATE-TYPE-NUMBER (e.g., MH-AMBU-0234)
+  const vehicleRegRegex = /^[A-Z]{2}\d{2}[A-Z]{2}\d{4}$/i; // Format: STATE + 2 digits + 2 letters + 4 digits (e.g., MH15BA3254)
+
   // Fetch profile data when profile tab is active
   useEffect(() => {
       fetchAdminProfile();
     
   }, []);
+
+  useEffect(() => {
+  const fetchFireBookings = async () => {
+    setFireBookingsLoading(true);
+    setFireBookingsError('');
+    const token = localStorage.getItem('jwt') || localStorage.getItem('token');
+    
+    if (!token) {
+      setFireBookingsError('Authentication required to view recent activity.');
+      setFireBookingsLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('http://localhost:8080/booking/fire', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: 'Failed to parse error response.' }));
+        throw new Error(errorData.message || 'Failed to fetch fire bookings');
+      }
+
+      const data = await res.json();
+      const pendingBookings = data.filter(booking => booking.status === 'PENDING');
+      const completedBookings = data.filter(booking => booking.status === 'COMPLETED');
+      setFireBookings([...pendingBookings, ...completedBookings]);
+    } catch (err) {
+      setFireBookingsError(err.message || 'Could not load recent activity.');
+    } finally {
+      setFireBookingsLoading(false);
+    }
+  };
+
+  fetchFireBookings();
+}, []);
+
+
+    const validateField = (name, value) => {
+    let error = '';
+    switch (name) {
+      case 'fullName':
+        if (!value.trim()) error = 'Full Name is required.';
+        else if (value.length > 100) error = 'Full Name cannot exceed 100 characters.';
+        break;
+      case 'email':
+        if (!value.trim()) error = 'Email is required.';
+        else if (!emailRegex.test(value)) error = 'Please enter a valid email address.';
+        break;
+      case 'phoneNumber':
+        if (!value.trim()) error = 'Phone Number is required.';
+        else if (!phoneRegex.test(value)) error = 'Must be a 10-digit Indian number (starts with 6-9).';
+        break;
+      case 'governmentId':
+        if (!value.trim()) error = 'Government ID is required.';
+        else if (!panRegex.test(value)) error = 'Enter valid PAN number (e.g., ABCDE1234F).';
+        break;
+      case 'password':
+        if (!value.trim()) error = 'Password is required.';
+        else if (value.length < 6) error = 'Password must be at least 6 characters long.';
+        break;
+      case 'licenseNumber':
+        if (!value.trim()) error = 'License Number is required.';
+        else if (!licenseRegex.test(value)) error = 'Enter valid License (e.g., MH-AMBU-0234).';
+        break;
+      case 'vehicleRegNumber':
+        if (!value.trim()) error = 'Vehicle Registration is required.';
+        else if (!vehicleRegRegex.test(value)) error = 'Enter valid Vehicle Reg (e.g., MH15BA3254).';
+        break;
+      case 'hospitalID':
+        if (!value) error = 'hospital Station ID is required.'; // Allow 0 for empty field, validate onBlur/submit
+        else if (isNaN(Number(value)) || Number(value) <= 0) error = 'hospital Station ID must be a positive number.';
+        break;
+      case 'securityAnswer':
+        if (!value.trim()) error = 'Security Answer is required.';
+        break;
+      default:
+        break;
+    }
+    setFormErrors(prev => ({ ...prev, [name]: error }));
+    return error === '';
+  };
   useEffect(() => {
     setStatsLoading(true);
     setStatsError('');
@@ -253,34 +345,66 @@ export default function FireDashboard() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'emergencies') {
-      setFireBookingsLoading(true);
-      setFireBookingsError('');
-      const token = localStorage.getItem('jwt') || localStorage.getItem('token');
-      if (!token) {
-        setFireBookingsError('Authentication required to view emergencies.');
-        setFireBookingsLoading(false);
-        return;
-      }
-      fetch('http://localhost:8080/booking/fire', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-        .then(async res => {
-          if (!res.ok) {
-            const errorData = await res.json().catch(() => ({ message: 'Failed to parse error response.' }));
-            throw new Error(errorData.message || 'Failed to fetch fire bookings');
-          }
-          return res.json();
-        })
-        .then(data => {
-          const pendingBookings = data.filter(booking => booking.status === 'PENDING');
-          const completedBookings = data.filter(booking => booking.status === 'COMPLETED');
-          setFireBookings([...pendingBookings, ...completedBookings]);
-        })
-        .catch(err => setFireBookingsError(err.message || 'Could not load fire bookings.'))
-        .finally(() => setFireBookingsLoading(false));
+  if (activeTab === 'emergencies') {
+    setFireBookingsLoading(true);
+    setFireBookingsError('');
+    const token = localStorage.getItem('jwt') || localStorage.getItem('token');
+
+    if (!token) {
+      setFireBookingsError('Authentication required to view emergencies.');
+      setFireBookingsLoading(false);
+      return;
     }
-  }, [activeTab]);
+
+    fetch('http://localhost:8080/booking/fire', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(async res => {
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({ message: 'Failed to parse error response.' }));
+          throw new Error(errorData.message || 'Failed to fetch fire bookings');
+        }
+        return res.json();
+      })
+      .then(async data => {
+        const pendingBookings = data.filter(booking => booking.status === 'PENDING');
+        const completedBookings = data.filter(booking => booking.status === 'COMPLETED');
+        const allBookings = [...pendingBookings, ...completedBookings];
+
+        setFireBookings(allBookings);
+
+        // 🔥 ADDED: Fetch user metadata
+        const uniqueUserIds = [...new Set(allBookings.map(b => b.requested_by_user_id))];
+        const userMap = {};
+
+        await Promise.all(
+          uniqueUserIds.map(async userId => {
+            try {
+              const res = await fetch(`http://localhost:8080/api/user/${userId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              if (res.ok) {
+                const userData = await res.json();
+                userMap[userId] = {
+                  name: userData.fullName,
+                  email: userData.email
+                };
+              } else {
+                userMap[userId] = { name: 'Unknown', email: '-' };
+              }
+            } catch (err) {
+              userMap[userId] = { name: 'Error', email: '-' };
+            }
+          })
+        );
+
+        setRequestingUsers(userMap); // ✅ Update the state you declared
+      })
+      .catch(err => setFireBookingsError(err.message || 'Could not load fire bookings.'))
+      .finally(() => setFireBookingsLoading(false));
+  }
+}, [activeTab]);
+
 
   // Fetch profile data when profile tab is active
   useEffect(() => {
@@ -503,10 +627,21 @@ export default function FireDashboard() {
   e.preventDefault();
   setMessage('');
 
-  if (!validateAllRegistrationFields()) {
-    setMessage('Please correct the errors in the form before submitting.');
-    return;
-  }
+  const validateAllRegistrationFields = () => {
+    let isValid = true;
+    for (const key in form) {
+      if (key !== 'hospitalID' && key !== 'securityQuestion' && !form[key].trim()) { // Check for empty strings for text fields
+          setFormErrors(prev => ({ ...prev, [key]: `${key.replace(/([A-Z])/g, ' $1').trim()} is required.` }));
+          isValid = false;
+      } else if (key === 'hospitalID' && (isNaN(Number(form[key])) || Number(form[key]) <= 0)) {
+          setFormErrors(prev => ({ ...prev, [key]: 'Hospital ID must be a positive number.' }));
+          isValid = false;
+      } else if (!validateField(key, form[key])) { // Run specific regex/length validation
+        isValid = false;
+      }
+    }
+    return isValid;
+  };
 
   setLoading(true);
   try {
@@ -607,48 +742,70 @@ export default function FireDashboard() {
   };
 
   const handleGetStationHistory = async () => {
-    if (!queryForm.stationId.toString().trim() || !validateQueryField('stationId', queryForm.stationId)) {
-      setMessage('Please enter a valid positive Station ID to get history.');
-      return;
-    }
+  if (!queryForm.stationId.toString().trim() || !validateQueryField('stationId', queryForm.stationId)) {
+    setMessage('Please enter a valid positive Station ID to get history.');
+    return;
+  }
 
-    setMessage('');
-    setLoading(true);
-    setData(null);
+  setMessage('');
+  setLoading(true);
+  setData(null);
 
-    const token = localStorage.getItem('jwt') || localStorage.getItem('token');
-    if (!token) {
-      setMessage('Authentication token not found. Please login again.');
-      setLoading(false);
-      return;
-    }
+  const token = localStorage.getItem('jwt') || localStorage.getItem('token');
+  if (!token) {
+    setMessage('Authentication token not found. Please login again.');
+    setLoading(false);
+    return;
+  }
 
-    try {
-      const res = await fetch(`http://localhost:8080/fire/admin/station/${queryForm.stationId}/history`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (res.ok) {
-        const result = await res.json();
-        setData(result);
-        if (result.length === 0) {
-          setMessage('No history found for this station ID.');
-        } else {
-          setMessage('Station history retrieved successfully!');
-        }
-      } else {
-        const data = await res.json().catch(() => ({}));
-        setMessage(data.message || 'Failed to get station history.');
+  try {
+    const res = await fetch(`http://localhost:8080/fire/admin/station/${queryForm.stationId}/history`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
       }
-    } catch (err) {
-      setMessage('Network error. Please try again.');
-    } finally {
-      setLoading(false);
+    });
+
+    if (res.ok) {
+      const result = await res.json();
+
+      // 👇 Transform snake_case to camelCase
+      const camelCasedResult = result.map(r => ({
+        bookingId: r.booking_id,
+        pickupLatitude: r.pickup_latitude,
+        pickupLongitude: r.pickup_longitude,
+        issueType: r.issue_type,
+        status: r.status,
+        createdAt: r.created_at,
+        victimPhoneNumber: r.victim_phone_number,
+        requestedByUserId: r.requested_by_user_id,
+        isForSelf: r.is_for_self,
+        needsAmbulance: r.needs_ambulance,
+        needsPolice: r.needs_police,
+        needsFireBrigade: r.needs_fire_brigade,
+        requestedAmbulanceCount: r.requested_ambulance_count,
+        requestedPoliceCount: r.requested_police_count,
+        requestedFireTruckCount: r.requested_fire_truck_count
+      }));
+
+      setData(camelCasedResult);
+
+      if (camelCasedResult.length === 0) {
+        setMessage('No history found for this station ID.');
+      } else {
+        setMessage('Station history retrieved successfully!');
+      }
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setMessage(data.message || 'Failed to get station history.');
     }
-  };
+  } catch (err) {
+    setMessage('Network error. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleGetTruckHistory = async () => {
     if (!queryForm.truckId.toString().trim() || !validateQueryField('truckId', queryForm.truckId)) {
@@ -677,7 +834,26 @@ export default function FireDashboard() {
 
       if (res.ok) {
         const result = await res.json();
-        setData(result);
+        const camelCasedResult = result.map(r => ({
+  bookingId: r.booking_id,
+  pickupLatitude: r.pickup_latitude,
+  pickupLongitude: r.pickup_longitude,
+  issueType: r.issue_type,
+  status: r.status,
+  createdAt: r.created_at,
+  victimPhoneNumber: r.victim_phone_number,
+  requestedByUserId: r.requested_by_user_id,
+  isForSelf: r.is_for_self,
+  needsAmbulance: r.needs_ambulance,
+  needsPolice: r.needs_police,
+  needsFireBrigade: r.needs_fire_brigade,
+  requestedAmbulanceCount: r.requested_ambulance_count,
+  requestedPoliceCount: r.requested_police_count,
+  requestedFireTruckCount: r.requested_fire_truck_count
+}));
+setData(camelCasedResult);
+
+        setData(camelCasedResult);
         if (result.length === 0) {
           setMessage('No history found for this truck ID.');
         } else {
@@ -723,7 +899,25 @@ export default function FireDashboard() {
       });
       if (res.ok) {
         const result = await res.json();
-        setReportTruckHistory(result);
+        const camelCasedResult = result.map(r => ({
+        bookingId: r.booking_id,
+        pickupLatitude: r.pickup_latitude,
+        pickupLongitude: r.pickup_longitude,
+        issueType: r.issue_type,
+        status: r.status,
+        createdAt: r.created_at,
+        victimPhoneNumber: r.victim_phone_number,
+        requestedByUserId: r.requested_by_user_id,
+        isForSelf: r.is_for_self,
+        needsAmbulance: r.needs_ambulance,
+        needsPolice: r.needs_police,
+        needsFireBrigade: r.needs_fire_brigade,
+        requestedAmbulanceCount: r.requested_ambulance_count,
+        requestedPoliceCount: r.requested_police_count,
+        requestedFireTruckCount: r.requested_fire_truck_count
+      }));
+      setReportTruckHistory(camelCasedResult);
+
         if (result.length === 0) {
           setReportError('No history found for this truck ID.');
         }
@@ -1114,11 +1308,17 @@ export default function FireDashboard() {
        </div>
 
       {/* Admin Avatar */}
-      <img
-        src={FireAdmin} // <-- replace with actual Fire admin avatar if different
-        alt="Admin"
-        className="h-10 w-10 rounded-full object-cover border-2 border-white shadow"
-      />
+      <div
+  onClick={() => setActiveTab('profile')}
+  title="Go to Profile"
+  className="cursor-pointer"
+>
+  <img
+    src={FireAdmin}
+    alt="Admin"
+    className="h-10 w-10 rounded-full object-cover border-2 border-white shadow"
+  />
+</div>
 
       {/* Icon Actions */}
       <div className="flex items-center gap-2">
@@ -1152,7 +1352,6 @@ export default function FireDashboard() {
           {[
             { id: 'overview', name: 'Overview', icon: <ChartBarIcon className="h-5 w-5" /> },
             { id: 'stations', name: 'Stations', icon: <BuildingOfficeIcon className="h-5 w-5" /> },
-            { id: 'trucks', name: 'Trucks', icon: <TruckIcon className="h-5 w-5" /> },
             { id: 'management', name: 'Management', icon: <MagnifyingGlassIcon className="h-5 w-5" /> },
             { id: 'emergencies', name: 'Emergencies', icon: <FireIcon className="h-5 w-5 text-red-600" /> },
             { id: 'profile', name: 'Profile', icon: <UserIcon className="h-5 w-5" /> },
@@ -1208,13 +1407,6 @@ export default function FireDashboard() {
                   bgColorClass="bg-white"
                 />
                 <QuickActionCard
-                  title="Update Location"
-                  description="Update truck locations"
-                  icon={<MapPinIcon className="h-6 w-6" />}
-                  onClick={() => setActiveTab('update-location')}
-                  bgColorClass="bg-white"
-                />
-                <QuickActionCard
                   title="View Emergencies"
                   description="Monitor active emergencies"
                   icon={<FireIcon className="h-6 w-6" />}
@@ -1223,171 +1415,296 @@ export default function FireDashboard() {
                 />
               
     
-                <QuickActionCard
-                  title="My Profile"
-                  description="Update personal information"
-                  icon={<UserIcon className="h-6 w-6" />}
-                  onClick={() => setActiveTab('profile')}
-                  bgColorClass="bg-white"
-                />
-                <QuickActionCard
-                  title="Emergency Contacts"
-                  description="Quick contact list"
-                  icon={<PhoneIcon className="h-6 w-6" />}
-                  onClick={() => alert('Emergency contacts feature coming soon!')}
-                  bgColorClass="bg-white"
-                />
+               
               </div>
             </div>
 
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* 🔥 Fire Dashboard Statistics */}
+            <div className="mt-10">
+              <SectionHeader icon={<FireIcon className="text-primary" />} title="Fire Dashboard Statistics" />
+
               {statsLoading ? (
-                <motion.div className="col-span-4 text-center py-8 text-blue-600 font-semibold" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>Loading statistics...</motion.div>
+                <motion.div
+                  className="text-center py-6 text-blue-600 font-medium"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  Loading statistics...
+                </motion.div>
               ) : statsError ? (
-                <motion.div className="col-span-4 text-center py-8 text-red-600 font-semibold" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>{statsError}</motion.div>
+                <motion.div
+                  className="text-center py-6 text-red-600 font-medium"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  {statsError}
+                </motion.div>
               ) : dashboardStats ? (
                 <>
-                  <StatCard
-                    title="Total Stations"
-                    value={dashboardStats.total_fire_stations}
-                    subtitle="Active fire stations"
-                    bgColorClass="bg-white" // Minimal white card
-                    icon={<BuildingOfficeIcon />}
-                  />
-                  <StatCard
-                    title="Total Fire Trucks"
-                    value={dashboardStats.total_fire_trucks}
-                    subtitle="Available fire trucks"
-                    bgColorClass="bg-white" // Minimal white card
-                    icon={<TruckIcon />}
-                  />
-                  <StatCard
-                    title="Fire Service Bookings"
-                    value={dashboardStats.fire_service_bookings}
-                    subtitle="Today's calls"
-                    bgColorClass="bg-white" // Minimal white card
-                    icon={<FireIcon />}
-                  />
-                  <StatCard
-                    title="Avg Completion Time"
-                    value={dashboardStats.average_completion_time_minutes + ' min'}
-                    subtitle="Emergency response"
-                    bgColorClass="bg-white" // Minimal white card
-                    icon={<ClockIcon />}
-                  />
+                  {/* 📊 Fire Stats Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <StatCard
+                      title="Total Stations"
+                      value={dashboardStats.total_fire_stations}
+                      subtitle="Active fire stations"
+                      icon={<BuildingOfficeIcon className="h-6 w-6 text-orange-700" />}
+                      bgColorClass="bg-gradient-to-tr from-orange-50 to-white"
+                    />
+                    <StatCard
+                      title="Total Fire Trucks"
+                      value={dashboardStats.total_fire_trucks}
+                      subtitle="Available fleet"
+                      icon={<TruckIcon className="h-6 w-6 text-red-600" />}
+                      bgColorClass="bg-gradient-to-tr from-red-50 to-white"
+                    />
+                    <StatCard
+                      title="Service Bookings"
+                      value={dashboardStats.fire_service_bookings}
+                      subtitle="Today's calls"
+                      icon={<FireIcon className="h-6 w-6 text-red-500" />}
+                      bgColorClass="bg-gradient-to-tr from-rose-50 to-white"
+                    />
+                    <StatCard
+                      title="Avg Completion"
+                      value={`${dashboardStats.average_completion_time_minutes} min`}
+                      subtitle="Response time"
+                      icon={<ClockIcon className="h-6 w-6 text-gray-700" />}
+                      bgColorClass="bg-gradient-to-tr from-gray-100 to-white"
+                    />
+                  </div>
                 </>
               ) : null}
             </div>
 
-            {/* Recent Activity */}
-            <motion.div className="bg-white rounded-lg shadow-md p-6" variants={itemVariants}>
-              <h3 className="text-xl font-semibold text-gray-800 mb-4">Recent Activity</h3>
-              <div className="space-y-4">
-                {[
-                  { time: '2 min ago', action: 'New fire emergency reported', location: 'Industrial Area' },
-                  { time: '5 min ago', action: 'Fire truck dispatched', location: 'Central Station' },
-                  { time: '12 min ago', action: 'Station status updated', location: 'North District' },
-                  { time: '18 min ago', action: 'Emergency resolved', location: 'South Station' }
-                ].map((activity, index) => (
-                  <motion.div
-                    key={index}
-                    className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors duration-150"
-                    variants={itemVariants}
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{activity.action}</p>
-                      <p className="text-xs text-gray-500">{activity.location}</p>
-                    </div>
-                    <span className="text-xs text-gray-400">{activity.time}</span>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
+
+           
 
             {/* Recent Emergencies */}
-            <motion.div className="bg-white rounded-lg shadow-md p-6" variants={itemVariants}>
-              <h3 className="text-xl font-semibold text-gray-800 mb-4">Recent Emergencies</h3>
-              <div className="space-y-3">
-                {fireBookingsLoading ? (
-                  <motion.div className="text-blue-600" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>Loading fire bookings...</motion.div>
-                ) : fireBookingsError ? (
-                  <motion.div className="text-red-600" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>{fireBookingsError}</motion.div>
-                ) : fireBookings.length === 0 ? (
-                  <motion.div className="text-gray-500" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>No recent emergencies found.</motion.div>
-                ) : (
-                  fireBookings.slice(0, 5).map((b) => (
-                    <motion.div
-                      key={b.booking_id}
-                      className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors duration-150"
-                      variants={itemVariants}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-3 h-3 rounded-full ${
-                          b.status === 'COMPLETED' ? 'bg-green-500' :
-                            b.status === 'PENDING' ? 'bg-yellow-500' : 'bg-red-500'
-                        }`}></div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{b.issue_type}</p>
-                          <p className="text-xs text-gray-500">Booking ID: {b.booking_id}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className={`text-xs px-2 py-1 rounded ${
-                          b.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                            b.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {b.status}
-                        </span>
-                        <p className="text-xs text-gray-400 mt-1">{new Date(b.created_at).toLocaleString()}</p>
-                      </div>
-                    </motion.div>
-                  ))
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
+            <div className="mt-12 space-y-10">
+              <SectionHeader
+                icon={<ExclamationCircleIcon className="h-6 w-6 text-primary" />}
+                title="Recent Fire Emergencies"
+              />
 
-        {activeTab === 'stations' && (
-          <motion.div className="space-y-8" variants={containerVariants} initial="hidden" animate="visible">
-            <div className="flex items-center justify-between">
-              <SectionHeader icon={<BuildingOfficeIcon />} title="Fire Stations" />
-              <motion.button
-                onClick={() => setActiveTab('add-station')}
-                className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors duration-200 flex items-center space-x-2"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <PlusIcon className="h-5 w-5" /> <span>Add Station</span>
-              </motion.button>
+              {fireBookingsLoading ? (
+                <motion.div className="text-center py-6 text-primary font-medium" variants={itemVariants}>
+                  Loading fire emergencies...
+                </motion.div>
+              ) : fireBookingsError ? (
+                <motion.div className="text-center py-6 text-red-600 font-medium" variants={itemVariants}>
+                  {fireBookingsError}
+                </motion.div>
+              ) : fireBookings.length === 0 ? (
+                <motion.div className="text-center py-6 text-gray-400" variants={itemVariants}>
+                  No recent fire emergencies found.
+                </motion.div>
+              ) : (
+                <>
+                  {/* 🔥 Pending Fires */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-yellow-700 mb-3 flex items-center gap-2">
+                      <ExclamationCircleIcon className="h-5 w-5" />
+                      Pending Emergencies
+                    </h3>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {fireBookings
+                        .filter((b) => b.status !== 'COMPLETED')
+                        .map((b) => (
+                          <motion.div
+                            key={b.booking_id}
+                            className="bg-white border border-yellow-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition"
+                            variants={itemVariants}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-semibold text-gray-700">ID: {b.booking_id}</span>
+                              <span className="text-xs font-medium px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                                {b.status}
+                              </span>
+                            </div>
+                            <div className="text-sm text-gray-600 mb-1">
+                              <span className="font-medium text-gray-800">Issue:</span> {b.issue_type}
+                            </div>
+                            <div className="text-sm text-gray-600 mb-1">
+                              <span className="font-medium text-gray-800">Fire Location:</span> {b.pickup_latitude}, {b.pickup_longitude}
+                            </div>
+                            <div className="text-sm text-gray-500 mt-2">
+                              <ClockIcon className="inline h-4 w-4 mr-1 text-gray-400" />
+                              Time :{new Date(b.created_at).toLocaleString()}
+                            </div>
+                           <div className="flex items-center text-sm text-gray-600 mb-1">
+                              <div className="mr-3 flex items-center justify-center h-full">
+                                <UserIcon className="h-6 w-6 text-gray-400" />
+                              </div>
+                              <div className="text-left">
+                                <div className="font-medium">Requested by {requestingUsers[b.requested_by_user_id]?.name || 'Loading...'}</div>
+                                <div className="text-xs text-gray-500">{requestingUsers[b.requested_by_user_id]?.email}</div>
+                              </div>
+                            </div>
+
+
+                          </motion.div>
+                        ))}
+                    </div>
+                  </div>
+
+                  {/* ✅ Completed Fires */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-green-700 mb-3 flex items-center gap-2">
+                      <CheckCircleIcon className="h-5 w-5" />
+                      Completed Emergencies
+                    </h3>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {fireBookings
+                        .filter((b) => b.status === 'COMPLETED')
+                        .map((b) => (
+                          <motion.div
+                            key={b.booking_id}
+                            className="bg-white border border-green-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition"
+                            variants={itemVariants}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-semibold text-gray-700">ID: {b.booking_id}</span>
+                              <span className="text-xs font-medium px-2 py-1 rounded-full bg-green-100 text-green-700">
+                                {b.status}
+                              </span>
+                            </div>
+                            <div className="text-sm text-gray-600 mb-1">
+                              <span className="font-medium text-gray-800">Issue:</span> {b.issue_type}
+                            </div>
+                            <div className="text-sm text-gray-600 mb-1">
+                              <span className="font-medium text-gray-800">Fire Location:</span> {b.pickup_latitude}, {b.pickup_longitude}
+                            </div>
+                            <div className="text-sm text-gray-500 mt-2">
+                              <ClockIcon className="inline h-4 w-4 mr-1 text-gray-400" />
+                              Time :{new Date(b.created_at).toLocaleString()}
+                            </div>
+                           <div className="flex items-center text-sm text-gray-600 mb-1">
+                              <div className="mr-3 flex items-center justify-center h-full">
+                                <UserIcon className="h-6 w-6 text-gray-400" />
+                              </div>
+                              <div className="text-left">
+                                <div className="font-medium">Requested by {requestingUsers[b.requested_by_user_id]?.name || 'Loading...'}</div>
+                                <div className="text-xs text-gray-500">{requestingUsers[b.requested_by_user_id]?.email}</div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-
-            {/* Station List */}
-            <motion.div className="bg-white rounded-lg shadow-md" variants={itemVariants}>
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Active Stations</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {stationRankings.map((station, index) => (
-                    <motion.div
-                      key={index}
-                      className="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow duration-200"
-                      variants={itemVariants}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <h4 className="font-semibold text-gray-900">{station.name}</h4>
-                      <p className="text-sm text-gray-600">Trucks: {station.trucks}</p>
-                      <span className="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full mt-2">
-                        <CheckCircleIcon className="h-3 w-3 inline-block mr-1" /> Active
-                      </span>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
           </motion.div>
         )}
+
+
+     {activeTab === 'stations' && (
+  <motion.div className="space-y-8" variants={containerVariants} initial="hidden" animate="visible">
+    
+    {/* 🔘 Section Header and Add Button */}
+    <div className="flex items-center justify-between">
+      <SectionHeader icon={<BuildingOfficeIcon />} title="Fire Stations" />
+      <motion.button
+        onClick={() => setActiveTab('add-station')}
+        className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors duration-200 flex items-center space-x-2"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+      >
+        <PlusIcon className="h-5 w-5" /> <span>Add Station</span>
+      </motion.button>
+    </div>
+
+    {/* 🚒 All Fire Stations Section */}
+    <motion.div className="mb-8 p-6 bg-white rounded-2xl border border-gray-200 shadow-sm space-y-6" variants={itemVariants}>
+      <h3 className="text-xl font-semibold text-red-700 flex items-center gap-2">
+        <BuildingOfficeIcon className="h-6 w-6 text-red-500" />
+        All Fire Stations
+      </h3>
+
+      {/* 🔴 Error Display */}
+      {fireStationsError && (
+        <motion.div
+          className="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md"
+          role="alert"
+          variants={itemVariants}
+        >
+          {fireStationsError}
+        </motion.div>
+      )}
+
+      {/* 📋 Table */}
+      <motion.div className="overflow-x-auto" variants={itemVariants}>
+        {fireStations && Array.isArray(fireStations) && fireStations.length > 0 ? (
+          <table className="min-w-full bg-white border border-gray-200 rounded-xl overflow-hidden text-sm">
+            <thead className="bg-gray-100 text-gray-700">
+              <tr>
+                <th className="px-4 py-3 text-center font-medium">ID</th>
+                <th className="px-4 py-3 text-center font-medium">Station Name</th>
+                <th className="px-4 py-3 text-left font-medium">Latitude</th>
+                <th className="px-4 py-3 text-left font-medium">Longitude</th>
+                <th className="px-4 py-3 text-left font-medium">Address</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {fireStations.map((station, idx) => (
+                <tr key={idx} className="hover:bg-red-50 transition">
+                  <td className="px-4 text-center py-3 text-gray-800 font-semibold">{station.id}</td>
+                  <td className="px-4 text-center py-3 text-gray-800">{station.fireStationName || 'N/A'}</td>
+                  <td className="px-4 py-3 text-center text-gray-800">
+                    <span className='flex items-center gap-1'>
+                      <MapPinIcon className="h-4 w-4 text-red-400" />
+                      {station.latitude?.toFixed(4)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-800">
+                    <span className='flex items-center gap-1'>
+                      <MapPinIcon className="h-4 w-4 text-red-400" />
+                      {station.longitude?.toFixed(4)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-800 font-semibold">Loading...</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          !fireStationsLoading && (
+            <motion.div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300" variants={itemVariants}>
+              <BuildingOfficeIcon className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600 font-medium">No fire stations data available</p>
+              <p className="text-gray-500 text-sm mt-1">Click the button above to fetch fire station information</p>
+            </motion.div>
+          )
+        )}
+      </motion.div>
+
+      {/* 🔁 Refresh Button */}
+      <div className="flex justify-end">
+        <motion.button
+          onClick={fetchAllFireStations}
+          disabled={fireStationsLoading}
+          className="bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-lg shadow-md transition disabled:opacity-50 flex items-center gap-2 font-medium"
+          whileHover={{ scale: 1.05, y: -1 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          {fireStationsLoading ? (
+            <>
+              <svg className="animate-spin h-5 w-5 mr-2 text-white" viewBox="0 0 24 24"></svg>
+              Loading...
+            </>
+          ) : (
+            <>
+              <FireIcon className="h-5 w-5 text-white" />
+              Refresh Fire Stations
+            </>
+          )}
+        </motion.button>
+      </div>
+    </motion.div>
+  </motion.div>
+)}
+
+
 
         {activeTab === 'add-station' && (
           <motion.div className="max-w-2xl mx-auto" variants={containerVariants} initial="hidden" animate="visible">
@@ -1493,364 +1810,178 @@ export default function FireDashboard() {
           </motion.div>
         )}
 
-        {activeTab === 'trucks' && (
-          <motion.div className="space-y-8" variants={containerVariants} initial="hidden" animate="visible">
-            <div className="flex items-center justify-between">
-              <SectionHeader icon={<TruckIcon />} title="Fire Trucks" />
-              <motion.button
-                onClick={() => setActiveTab('update-location')}
-                className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors duration-200 flex items-center space-x-2"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <MapPinIcon className="h-5 w-5" /> <span>Update Location</span>
-              </motion.button>
-            </div>
-
-            {/* Truck Management */}
-            <motion.div className="bg-white rounded-lg shadow-md p-6" variants={itemVariants}>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Query Truck Data</h3>
-              <div className="space-y-4 max-w-md">
-                <motion.div variants={itemVariants}>
-                  <label htmlFor="queryStationId" className="block text-sm font-medium text-gray-700 mb-1">Station ID</label>
-                  <input
-                    id="queryStationId"
-                    name="stationId"
-                    value={queryForm.stationId}
-                    onChange={handleQueryChange}
-                    onBlur={handleQueryBlur}
-                    placeholder="Enter Station ID"
-                    type="number"
-                    min="1"
-                    className={`w-full px-4 py-2 border ${queryFormErrors.stationId ? 'border-red-500' : 'border-gray-300'} rounded-md mb-2 focus:ring-blue-500 focus:border-blue-500`}
-                  />
-                  {queryFormErrors.stationId && <p className="mt-1 text-sm text-red-600">{queryFormErrors.stationId}</p>}
-                  <div className="flex gap-2">
-                    <motion.button
-                      onClick={handleGetTrucks}
-                      disabled={loading}
-                      className="flex-1 bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600 disabled:opacity-50 transition-colors duration-200"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <TruckIcon className="h-5 w-5 inline-block mr-1" /> Get Trucks
-                    </motion.button>
-                    <motion.button
-                      onClick={handleGetStationHistory}
-                      disabled={loading}
-                      className="flex-1 bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600 disabled:opacity-50 transition-colors duration-200"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <ClockIcon className="h-5 w-5 inline-block mr-1" /> Get Station History
-                    </motion.button>
-                  </div>
-                </motion.div>
-                <motion.div className="pt-4 border-t border-gray-200" variants={itemVariants}>
-                  <label htmlFor="queryTruckId" className="block text-sm font-medium text-gray-700 mb-1">Truck ID</label>
-                  <input
-                    id="queryTruckId"
-                    name="truckId"
-                    value={queryForm.truckId}
-                    onChange={handleQueryChange}
-                    onBlur={handleQueryBlur}
-                    placeholder="Enter Truck ID"
-                    type="number"
-                    min="1"
-                    className={`w-full px-4 py-2 border ${queryFormErrors.truckId ? 'border-red-500' : 'border-gray-300'} rounded-md mb-2 focus:ring-blue-500 focus:border-blue-500`}
-                  />
-                  {queryFormErrors.truckId && <p className="mt-1 text-sm text-red-600">{queryFormErrors.truckId}</p>}
-                  <motion.button
-                    onClick={handleGetTruckHistory}
-                    disabled={loading}
-                    className="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600 disabled:opacity-50 transition-colors duration-200"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <ClockIcon className="h-5 w-5 inline-block mr-1" /> Get Truck History
-                  </motion.button>
-                </motion.div>
-              </div>
-            </motion.div>
-
-            {message && <motion.div className={`mt-4 p-3 rounded-md flex items-center space-x-2 ${message.includes('success') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>{message.includes('success') ? <CheckCircleIcon className="h-5 w-5" /> : <XCircleIcon className="h-5 w-5" />}<span>{message}</span></motion.div>}
-
-            {data && (
-              <motion.div className="bg-white rounded-lg shadow-md p-6" variants={itemVariants}>
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Response Data</h3>
-                {Array.isArray(data) && data.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    {data[0].registrationNumber ? (
-                      <motion.table className="w-full text-sm bg-white border border-gray-200 rounded-lg overflow-hidden" initial="hidden" animate="visible" variants={containerVariants}>
-                        <motion.thead className="bg-gray-50" variants={itemVariants}> {/* Minimal table header */}
-                          <tr>
-                            <th className="px-4 py-2 border-b text-left text-gray-600">ID</th>
-                            <th className="px-4 py-2 border-b text-left text-gray-600">Registration</th>
-                            <th className="px-4 py-2 border-b text-left text-gray-600">Driver Name</th>
-                            <th className="px-4 py-2 border-b text-left text-gray-600">Phone</th>
-                            <th className="px-4 py-2 border-b text-left text-gray-600">Status</th>
-                            <th className="px-4 py-2 border-b text-left text-gray-600">Last Updated</th>
-                            <th className="px-4 py-2 border-b text-left text-gray-600">Location</th>
-                          </tr>
-                        </motion.thead>
-                        <motion.tbody className="bg-white">
-                          {data.map((truck, index) => (
-                            <motion.tr key={index} className="hover:bg-gray-50 border-b border-gray-100 last:border-b-0" variants={itemVariants}>
-                              <td className="px-4 py-3">{truck.id}</td>
-                              <td className="px-4 py-3 font-mono">{truck.registrationNumber}</td>
-                              <td className="px-4 py-3">{truck.driverName}</td>
-                              <td className="px-4 py-3">{truck.driverPhoneNumber}</td>
-                              <td className="px-4 py-3">
-                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                  truck.status === 'AVAILABLE' ? 'bg-green-100 text-green-800' :
-                                    truck.status === 'EN_ROUTE' ? 'bg-blue-100 text-blue-800' :
-                                      'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {truck.status}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-xs text-gray-500">
-                                {new Date(truck.lastUpdated).toLocaleString()}
-                              </td>
-                              <td className="px-4 py-3 text-xs text-gray-500">
-                                {truck.latitude?.toFixed(4)}, {truck.longitude?.toFixed(4)}
-                              </td>
-                            </motion.tr>
-                          ))}
-                        </motion.tbody>
-                      </motion.table>
-                    ) : data[0].bookingId ? (
-                      <motion.table className="w-full text-sm bg-white border border-gray-200 rounded-lg overflow-hidden" initial="hidden" animate="visible" variants={containerVariants}>
-                        <motion.thead className="bg-gray-50" variants={itemVariants}> {/* Minimal table header */}
-                          <tr>
-                            <th className="px-4 py-2 border-b text-left text-gray-600">Booking ID</th>
-                            <th className="px-4 py-2 border-b text-left text-gray-600">Pickup Location</th>
-                            <th className="px-4 py-2 border-b text-left text-gray-600">Issue Type</th>
-                            <th className="px-4 py-2 border-b text-left text-gray-600">Status</th>
-                            <th className="px-4 py-2 border-b text-left text-gray-600">Created At</th>
-                          </tr>
-                        </motion.thead>
-                        <motion.tbody className="bg-white">
-                          {data.map((booking, index) => (
-                            <motion.tr key={index} className="hover:bg-gray-50 border-b border-gray-100 last:border-b-0" variants={itemVariants}>
-                              <td className="px-4 py-3">{booking.bookingId}</td>
-                              <td className="px-4 py-3 text-xs text-gray-500">
-                                {booking.pickupLatitude?.toFixed(6)}, {booking.pickupLongitude?.toFixed(6)}
-                              </td>
-                              <td className="px-4 py-3">
-                                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-                                  {booking.issueType}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3">
-                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                  booking.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                                    booking.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                                      'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {booking.status}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-xs text-gray-500">{new Date(booking.createdAt).toLocaleString()}</td>
-                            </motion.tr>
-                          ))}
-                        </motion.tbody>
-                      </motion.table>
-                    ) : (
-                      <pre className="text-xs text-gray-700 bg-gray-50 p-4 rounded-md border border-gray-200 overflow-auto max-h-60">
-                        {JSON.stringify(data, null, 2)}
-                      </pre>
-                    )}
-                  </div>
-                ) : (
-                  <motion.p className="text-gray-600 mt-4" variants={itemVariants}>No data available for the given query. Try a different ID.</motion.p>
-                )}
-              </motion.div>
-            )}
-          </motion.div>
-        )}
-
-        {activeTab === 'update-location' && (
-          <motion.div className="max-w-2xl mx-auto" variants={containerVariants} initial="hidden" animate="visible">
-            <div className="bg-white p-8 rounded-lg shadow-md">
-              <div className="flex items-center justify-between mb-6">
-                <SectionHeader icon={<MapPinIcon />} title="Update Fire Truck Location" />
-                <button
-                  onClick={() => setActiveTab('trucks')}
-                  className="text-gray-500 hover:text-gray-700 flex items-center space-x-1"
-                >
-                  <ArrowLeftIcon className="h-4 w-4" /> <span>Back to Trucks</span>
-                </button>
-              </div>
-
-              <form onSubmit={handleLocationSubmit} className="space-y-6">
-                <motion.div variants={itemVariants}>
-                  <label htmlFor="truckIdUpdate" className="block text-sm font-medium text-gray-700 mb-1">Truck ID</label>
-                  <input
-                    id="truckIdUpdate"
-                    name="truckId"
-                    value={locationForm.truckId}
-                    onChange={handleLocationChange}
-                    onBlur={handleLocationBlur}
-                    placeholder="Enter truck ID"
-                    type="number"
-                    required
-                    min="1"
-                    className={`w-full px-4 py-2 border ${locationFormErrors.truckId ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out`}
-                  />
-                  {locationFormErrors.truckId && <p className="mt-1 text-sm text-red-600">{locationFormErrors.truckId}</p>}
-                </motion.div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <motion.div variants={itemVariants}>
-                    <label htmlFor="locationLatitude" className="block text-sm font-medium text-gray-700 mb-1">Latitude</label>
-                    <input
-                      id="locationLatitude"
-                      name="latitude"
-                      value={locationForm.latitude}
-                      onChange={handleLocationChange}
-                      onBlur={handleLocationBlur}
-                      placeholder="e.g., 19.12345"
-                      type="number"
-                      step="any"
-                      required
-                      min="-90"
-                      max="90"
-                      className={`w-full px-4 py-2 border ${locationFormErrors.latitude ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out`}
-                    />
-                    {locationFormErrors.latitude && <p className="mt-1 text-sm text-red-600">{locationFormErrors.latitude}</p>}
-                  </motion.div>
-                  <motion.div variants={itemVariants}>
-                    <label htmlFor="locationLongitude" className="block text-sm font-medium text-gray-700 mb-1">Longitude</label>
-                    <input
-                      id="locationLongitude"
-                      name="longitude"
-                      value={locationForm.longitude}
-                      onChange={handleLocationChange}
-                      onBlur={handleLocationBlur}
-                      placeholder="e.g., 72.54321"
-                      type="number"
-                      step="any"
-                      required
-                      min="-180"
-                      max="180"
-                      className={`w-full px-4 py-2 border ${locationFormErrors.longitude ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out`}
-                    />
-                    {locationFormErrors.longitude && <p className="mt-1 text-sm text-red-600">{locationFormErrors.longitude}</p>}
-                  </motion.div>
-                </div>
-
-                <motion.button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-blue-500 text-white py-3 rounded-md hover:bg-blue-600 disabled:opacity-50 font-semibold transition-colors duration-200"
-                  variants={itemVariants}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin h-5 w-5 mr-3 inline" viewBox="0 0 24 24"> {/* Spinner */} </svg>
-                      Updating Location...
-                    </>
-                  ) : 'Update Location'}
-                </motion.button>
-              </form>
-
-              {message && (
-                <motion.div
-                  className={`mt-6 p-4 rounded-md flex items-center space-x-2 ${
-                    message.includes('success')
-                      ? 'bg-green-100 text-green-700 border border-green-200'
-                      : 'bg-red-100 text-red-700 border border-red-200'
-                  }`}
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  {message.includes('success') ? <CheckCircleIcon className="h-5 w-5" /> : <XCircleIcon className="h-5 w-5" />}
-                  <span>{message}</span>
-                </motion.div>
-              )}
-            </div>
-          </motion.div>
-        )}
-
         {activeTab === 'management' && (
           <motion.div className="space-y-8" variants={containerVariants} initial="hidden" animate="visible">
             <SectionHeader icon={<MagnifyingGlassIcon />} title="Fire Station & Truck Management" />
             
-            {/* All Fire Stations Section */}
-            <motion.div className="bg-white rounded-lg shadow-md p-6" variants={itemVariants}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">All Fire Stations</h3>
-                <motion.button
-                  onClick={fetchAllFireStations}
-                  disabled={fireStationsLoading}
-                  className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-lg hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 shadow-lg transition-all duration-200 flex items-center gap-2 font-medium"
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  {fireStationsLoading ? (
-                    <>
-                      <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24"></svg>
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <BuildingOfficeIcon className="h-5 w-5" /> Fetch All Fire Stations
-                    </>
-                  )}
-                </motion.button>
-              </div>
+        
+            {/* All Fire Trucks Section */}
               
-              {fireStationsError && (
-                <motion.div
-                  className="mb-4 p-3 rounded-md bg-red-100 text-red-700 border border-red-200 flex items-center gap-2"
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  <InformationCircleIcon className="h-5 w-5" /> {fireStationsError}
-                </motion.div>
-              )}
-              
-              {fireStations && Array.isArray(fireStations) && fireStations.length > 0 ? (
-                <motion.div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm" variants={itemVariants}>
-                  <motion.table className="w-full text-sm bg-white" initial="hidden" animate="visible" variants={containerVariants}>
-                    <motion.thead className="bg-gradient-to-r from-blue-500 to-blue-600" variants={itemVariants}>
-                      <tr>
-                        <th className="px-4 py-3 border-b text-left text-white font-semibold">Station ID</th>
-                        <th className="px-4 py-3 border-b text-left text-white font-semibold">Station Name</th>
-                        <th className="px-4 py-3 border-b text-left text-white font-semibold">Latitude</th>
-                        <th className="px-4 py-3 border-b text-left text-white font-semibold">Longitude</th>
-                      </tr>
-                    </motion.thead>
-                    <motion.tbody className="bg-white">
-                      {fireStations.map((station, idx) => (
-                        <motion.tr 
-                          key={idx} 
-                          className="hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition-colors duration-200" 
-                          variants={itemVariants}
-                          whileHover={{ scale: 1.01 }}
+                {/* Truck Management */}
+                <motion.div className="bg-white rounded-lg shadow-md p-6" variants={itemVariants}>
+                    <motion.div className="bg-white w-full rounded-lg shadow-md p-6" variants={itemVariants}>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Query Truck Data</h3>
+                  <div className="flex w-full px-20 flex-col  gap-6">
+                    <motion.div variants={itemVariants}>
+                      <label htmlFor="queryStationId" className="block  text-sm font-medium text-gray-700 mb-1">Station ID</label>
+                      <input
+                        id="queryStationId"
+                        name="stationId"
+                        value={queryForm.stationId}
+                        onChange={handleQueryChange}
+                        onBlur={handleQueryBlur}
+                        placeholder="Enter Station ID"
+                        type="number"
+                        min="1"
+                        className={`w-full px-4 py-2 border ${queryFormErrors.stationId ? 'border-red-500' : 'border-gray-300'} rounded-md mb-2 focus:ring-blue-500 focus:border-blue-500`}
+                      />
+                      {queryFormErrors.stationId && <p className="mt-1 text-sm text-red-600">{queryFormErrors.stationId}</p>}
+                      <div className="flex  justify-center items-center gap-4">
+                        <motion.button
+                          onClick={handleGetTrucks}
+                          disabled={loading}
+                  className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-green-700 disabled:opacity-50 shadow-lg transition-all duration-200 flex items-center gap-2 font-medium"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
                         >
-                          <td className="px-4 py-3 font-bold text-blue-600">{station.id}</td>
-                          <td className="px-4 py-3 font-medium text-gray-800">{station.fireStationName || 'N/A'}</td>
-                          <td className="px-4 py-3 text-gray-700">{station.latitude}</td>
-                          <td className="px-4 py-3 text-gray-700">{station.longitude}</td>
-                        </motion.tr>
-                      ))}
-                    </motion.tbody>
-                  </motion.table>
-                </motion.div>
-              ) : (
-                !fireStationsLoading && (
-                  <motion.div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300" variants={itemVariants}>
-                    <BuildingOfficeIcon className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-600 font-medium">No fire stations data available</p>
-                    <p className="text-gray-500 text-sm mt-1">Click the button above to fetch fire station information</p>
+                          <TruckIcon className="h-5 w-5 inline-block mr-1" /> Get Trucks
+                        </motion.button>
+                        <motion.button
+                          onClick={handleGetStationHistory}
+                          disabled={loading}
+                  className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-green-700 disabled:opacity-50 shadow-lg transition-all duration-200 flex items-center gap-2 font-medium"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <ClockIcon className="h-5 w-5 inline-block mr-1" /> Get Station History
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                    <motion.div className="pt-4 border-t border-gray-200" variants={itemVariants}>
+                      <label htmlFor="queryTruckId" className="block text-sm font-medium text-gray-700 mb-1">Truck ID</label>
+                      <input
+                        id="queryTruckId"
+                        name="truckId"
+                        value={queryForm.truckId}
+                        onChange={handleQueryChange}
+                        onBlur={handleQueryBlur}
+                        placeholder="Enter Truck ID"
+                        type="number"
+                        min="1"
+                        className={`w-full px-4 py-2 border ${queryFormErrors.truckId ? 'border-red-500' : 'border-gray-300'} rounded-md mb-2 focus:ring-blue-500 focus:border-blue-500`}
+                      />
+                      {queryFormErrors.truckId && <p className="mt-1 text-sm text-red-600">{queryFormErrors.truckId}</p>}
+                      <div className="flex justify-center">
+                        <motion.button
+                          onClick={handleGetTruckHistory}
+                          disabled={loading}
+                          className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-green-700 disabled:opacity-50 shadow-lg transition-all duration-200 items-center gap-2 font-medium"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <ClockIcon className="h-5 w-5 inline-block mr-1" /> Get Truck History
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                    </div>
+                    </motion.div>
+                
+
+                {message && <motion.div className={`mt-4 p-3 rounded-md flex items-center space-x-2 ${message.includes('success') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>{message.includes('success') ? <CheckCircleIcon className="h-5 w-5" /> : <XCircleIcon className="h-5 w-5" />}<span>{message}</span></motion.div>}
+                {data && (
+                  <motion.div className="bg-white rounded-lg shadow-md p-6" variants={itemVariants}>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Response Data</h3>
+                    {Array.isArray(data) && data.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        {data[0].registrationNumber ? (
+                          <motion.table className="w-full text-sm bg-white border border-gray-200 rounded-lg overflow-hidden" initial="hidden" animate="visible" variants={containerVariants}>
+                            <motion.thead className="bg-gray-50" variants={itemVariants}> {/* Minimal table header */}
+                              <tr>
+                                <th className="px-4 py-2 border-b text-left text-gray-600">ID</th>
+                                <th className="px-4 py-2 border-b text-left text-gray-600">Registration</th>
+                                <th className="px-4 py-2 border-b text-left text-gray-600">Driver Name</th>
+                                <th className="px-4 py-2 border-b text-left text-gray-600">Phone</th>
+                                <th className="px-4 py-2 border-b text-left text-gray-600">Status</th>
+                                <th className="px-4 py-2 border-b text-left text-gray-600">Last Updated</th>
+                                <th className="px-4 py-2 border-b text-left text-gray-600">Location</th>
+                              </tr>
+                            </motion.thead>
+                            <motion.tbody className="bg-white">
+                              {data.map((truck, index) => (
+                                <motion.tr key={index} className="hover:bg-gray-50 border-b border-gray-100 last:border-b-0" variants={itemVariants}>
+                                  <td className="px-4 py-3">{truck.id}</td>
+                                  <td className="px-4 py-3 font-mono">{truck.registrationNumber}</td>
+                                  <td className="px-4 py-3">{truck.driverName}</td>
+                                  <td className="px-4 py-3">{truck.driverPhoneNumber}</td>
+                                  <td className="px-4 py-3">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                      truck.status === 'AVAILABLE' ? 'bg-green-100 text-green-800' :
+                                        truck.status === 'EN_ROUTE' ? 'bg-blue-100 text-blue-800' :
+                                          'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {truck.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-xs text-gray-500">
+                                    {new Date(truck.lastUpdated).toLocaleString()}
+                                  </td>
+                                  <td className="px-4 py-3 text-xs text-gray-500">
+                                    {truck.latitude?.toFixed(4)}, {truck.longitude?.toFixed(4)}
+                                  </td>
+                                </motion.tr>
+                              ))}
+                            </motion.tbody>
+                          </motion.table>
+                        ) : data[0].bookingId ? (
+                          <motion.table className="w-full text-sm bg-white border border-gray-200 rounded-lg overflow-hidden" initial="hidden" animate="visible" variants={containerVariants}>
+                            <motion.thead className="bg-gray-50" variants={itemVariants}> {/* Minimal table header */}
+                              <tr>
+                                <th className="px-4 py-2 border-b text-left text-gray-600">Booking ID</th>
+                                <th className="px-4 py-2 border-b text-left text-gray-600">Pickup Location</th>
+                                <th className="px-4 py-2 border-b text-left text-gray-600">Issue Type</th>
+                                <th className="px-4 py-2 border-b text-left text-gray-600">Status</th>
+                                <th className="px-4 py-2 border-b text-left text-gray-600">Created At</th>
+                              </tr>
+                            </motion.thead>
+                            <motion.tbody className="bg-white">
+                              {data.map((booking, index) => (
+                                <motion.tr key={index} className="hover:bg-gray-50 border-b border-gray-100 last:border-b-0" variants={itemVariants}>
+                                  <td className="px-4 py-3">{booking.bookingId}</td>
+                                  <td className="px-4 py-3 text-xs text-gray-500">
+                                    {booking.pickupLatitude?.toFixed(6)}, {booking.pickupLongitude?.toFixed(6)}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                                      {booking.issueType}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                      booking.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                                        booking.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                                          'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {booking.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-xs text-gray-500">{new Date(booking.createdAt).toLocaleString()}</td>
+                                </motion.tr>
+                              ))}
+                            </motion.tbody>
+                          </motion.table>
+                        ) : (
+                          <pre className="text-xs text-gray-700 bg-gray-50 p-4 rounded-md border border-gray-200 overflow-auto max-h-60">
+                            {JSON.stringify(data, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    ) : (
+                      <motion.p className="text-gray-600 mt-4" variants={itemVariants}>No data available for the given query. Try a different ID.</motion.p>
+                    )}
                   </motion.div>
-                )
-              )}
-            </motion.div>
+                )}
+                </motion.div>
+          
 
             {/* All Trucks Section */}
             <motion.div className="bg-white rounded-lg shadow-md p-6" variants={itemVariants}>
@@ -1998,7 +2129,7 @@ export default function FireDashboard() {
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
+                    <div className="grid gap-4">
                       <div className="bg-white p-4 rounded-lg shadow-sm border border-purple-100">
                         <div className="flex items-center gap-3 mb-2">
                           <svg className="h-5 w-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2022,7 +2153,7 @@ export default function FireDashboard() {
                       </div>
                     </div>
                     
-                    <div className="space-y-4">
+                    <div className="grid gap-4">
                       <div className="bg-white p-4 rounded-lg shadow-sm border border-purple-100">
                         <div className="flex items-center gap-3 mb-2">
                           <ShieldCheckIcon className="h-5 w-5 text-purple-500" />
@@ -2033,16 +2164,7 @@ export default function FireDashboard() {
                         </p>
                       </div>
                       
-                      <div className="bg-white p-4 rounded-lg shadow-sm border border-purple-100">
-                        <div className="flex items-center gap-3 mb-2">
-                          <TruckIcon className="h-5 w-5 text-purple-500" />
-                          <span className="text-gray-600 font-medium">Vehicle Registration</span>
-                        </div>
-                        <p className="font-mono text-sm bg-gray-100 px-3 py-2 rounded text-gray-700 font-semibold">
-                          {selectedDriverProfile.ambulanceRegNumber}
-                        </p>
-                      </div>
-                      
+  
                       <div className="bg-white p-4 rounded-lg shadow-sm border border-purple-100">
                         <div className="flex items-center gap-3 mb-2">
                           <ShieldCheckIcon className="h-5 w-5 text-purple-500" />
@@ -2148,6 +2270,15 @@ export default function FireDashboard() {
                           {selectedTruckDetails.driverPhoneNumber}
                         </a>
                       </div>
+                      <div className="bg-white p-4 rounded-lg shadow-sm border border-orange-100">
+  <div className="flex items-center gap-3 mb-2">
+    <TruckIcon className="h-5 w-5 text-orange-500" />
+    <span className="text-gray-600 font-medium">Registration Number</span>
+  </div>
+  <p className="text-orange-600 font-semibold text-lg">
+    {selectedTruckDetails.registrationNumber || 'N/A'}
+  </p>
+</div>
                     </div>
                     
                     <div className="space-y-4">
@@ -2174,7 +2305,6 @@ export default function FireDashboard() {
                           {selectedTruckDetails.latitude?.toFixed(4)}, {selectedTruckDetails.longitude?.toFixed(4)}
                         </p>
                       </div>
-                      
                       <div className="bg-white p-4 rounded-lg shadow-sm border border-orange-100">
                         <div className="flex items-center gap-3 mb-2">
                           <ClockIcon className="h-5 w-5 text-orange-500" />
@@ -2255,7 +2385,7 @@ export default function FireDashboard() {
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-white p-6 rounded-lg shadow-sm border border-indigo-100">
+                    <div className="bg-white p-6 rounded-lg shadow-sm border border-indigo-100 self-center">
                       <div className="flex items-center gap-3 mb-4">
                         <MapPinIcon className="h-6 w-6 text-indigo-500" />
                         <span className="text-gray-700 font-medium text-lg">Location Coordinates</span>
@@ -2288,6 +2418,26 @@ export default function FireDashboard() {
                         </div>
                       </div>
                     </div>
+
+                    {selectedStationDetails.latitude && selectedStationDetails.longitude && (
+    <div className="md:col-span-2">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-indigo-100">
+        <div className="flex items-center gap-3 mb-4">
+          <MapIcon className="h-6 w-6 text-indigo-500" />
+          <span className="text-gray-700 font-medium text-lg">Map Preview</span>
+        </div>
+        <div className="w-full h-72 overflow-hidden rounded-lg shadow-md border">
+          <iframe
+            className="w-full h-full"
+            src={`https://maps.google.com/maps?q=${selectedStationDetails.latitude},${selectedStationDetails.longitude}&z=16&output=embed`}
+            allowFullScreen
+            loading="lazy"
+            title="Station Location Map"
+          />
+        </div>
+      </div>
+    </div>
+  )}
                   </div>
                 </motion.div>
               ) : (
@@ -2386,69 +2536,123 @@ export default function FireDashboard() {
           </motion.div>
         )}
 
-        {activeTab === 'emergencies' && (
-          <motion.div className="bg-white rounded-lg shadow-md p-6" variants={containerVariants} initial="hidden" animate="visible">
-            <SectionHeader icon={<FireIcon />} title="Fire Emergency Requests" />
-            {fireBookingsLoading ? (
-              <motion.div className="text-blue-600" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>Loading fire bookings...</motion.div>
-            ) : fireBookingsError ? (
-              <motion.div className="text-red-600" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>{fireBookingsError}</motion.div>
-            ) : fireBookings.length === 0 ? (
-              <motion.div className="text-gray-500" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>No fire bookings found.</motion.div>
-            ) : (
-              <div className="overflow-x-auto">
-                <motion.table className="min-w-full bg-white rounded-lg shadow-sm border border-gray-200" initial="hidden" animate="visible" variants={containerVariants}>
-                  <motion.thead className="bg-gray-50" variants={itemVariants}> {/* Minimal table header */}
-                    <tr>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Booking ID</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Issue Type</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Status</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Created At</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Victim Phone</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Requested By</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">For Self</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Ambulance?</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Police?</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Fire Brigade?</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Ambulance Count</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Police Count</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Fire Truck Count</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Pickup Lat</th>
-                      <th className="px-4 py-3 border-b text-left text-gray-700">Pickup Lng</th>
-                    </tr>
-                  </motion.thead>
-                  <motion.tbody className="bg-white">
-                    {fireBookings.map(b => (
-                      <motion.tr key={b.booking_id} className="hover:bg-gray-50 border-b border-gray-100 last:border-b-0" variants={itemVariants}>
-                        <td className="px-4 py-3 text-center">{b.booking_id}</td>
-                        <td className="px-4 py-3 text-center">{b.issue_type}</td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            b.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                            b.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
-                          }`}>
-                            {b.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center text-xs text-gray-500">{new Date(b.created_at).toLocaleString()}</td>
-                        <td className="px-4 py-3 text-center">{b.victim_phone_number}</td>
-                        <td className="px-4 py-3 text-center">{b.requested_by_user_id}</td>
-                        <td className="px-4 py-3 text-center">{b.is_for_self ? 'Yes' : 'No'}</td>
-                        <td className="px-4 py-3 text-center">{b.needs_ambulance ? 'Yes' : 'No'}</td>
-                        <td className="px-4 py-3 text-center">{b.needs_police ? 'Yes' : 'No'}</td>
-                        <td className="px-4 py-3 text-center">{b.needs_fire_brigade ? 'Yes' : 'No'}</td>
-                        <td className="px-4 py-3 text-center">{b.requested_ambulance_count}</td>
-                        <td className="px-4 py-3 text-center">{b.requested_police_count}</td>
-                        <td className="px-4 py-3 text-center">{b.requested_fire_truck_count}</td>
-                        <td className="px-4 py-3 text-center text-xs text-gray-500">{b.pickup_latitude}, {b.pickup_longitude}</td>
-                      </motion.tr>
-                    ))}
-                  </motion.tbody>
-                </motion.table>
-              </div>
-            )}
-          </motion.div>
+       {activeTab === 'emergencies' && (
+          <motion.div
+              className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg p-6 border border-gray-200"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+            >
+              <SectionHeader icon={<FireIcon className="text-red-500" />} title="Fire Emergency Requests" />
+
+              {fireBookingsLoading ? (
+                <motion.div className="text-primary-600 font-medium text-center py-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  🔄 Loading fire emergency data...
+                </motion.div>
+              ) : fireBookingsError ? (
+                <motion.div className="text-red-600 text-center font-semibold py-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  ❌ {fireBookingsError}
+                </motion.div>
+              ) : fireBookings.length === 0 ? (
+                <motion.div className="text-gray-500 text-center py-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  No fire emergency requests at the moment.
+                </motion.div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto backdrop-blur-lg shadow-lg  rounded-xl ">
+                    <motion.table
+                      className="min-w-full bg-white rounded-lg border border-gray-200 shadow-md"
+                      initial="hidden"
+                      animate="visible"
+                      variants={containerVariants}
+                    >
+                      <motion.thead className="bg-orange-50 " variants={itemVariants}>
+                        <tr className="text-left text-gray-800 text-sm uppercase tracking-wide">
+                          <th className="px-4 py-3 border-b">Booking ID</th>
+                          <th className="px-4 py-3 border-b">Issue</th>
+                          <th className="px-4 py-3 border-b">Status</th>
+                          <th className="px-4 py-3 border-b">Created</th>
+                          <th className="px-4 py-3 border-b">Victim Phone</th>
+                          <th className="px-4 py-3 border-b">Requested By</th>
+                          <th className="px-4 py-3 border-b">Pickup Location</th>
+                        </tr>
+                      </motion.thead>
+                      <motion.tbody>
+                        {fireBookings.map((b) => (
+                          <motion.tr
+                            key={b.booking_id}
+                            className="hover:bg-orange-50/40 transition border-b border-gray-100 last:border-b-0"
+                            variants={itemVariants}
+                          >
+                            <td className="px-4 py-3 text-sm font-medium">{b.booking_id}</td>
+                            <td className="px-4 py-3 text-sm">{b.issue_type}</td>
+                            <td className="px-4 py-3 text-sm">
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  b.status === 'COMPLETED'
+                                    ? 'bg-green-100 text-green-800'
+                                    : b.status === 'PENDING'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}
+                              >
+                                {b.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-gray-500">{new Date(b.created_at).toLocaleString()}</td>
+                            <td className="px-4 py-3 text-sm">{b.victim_phone_number || '-'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700">
+                              {requestingUsers[b.requested_by_user_id]?.name || 'Loading...'}
+                              <div className="text-xs text-gray-400">
+                                {requestingUsers[b.requested_by_user_id]?.email}
+                              </div>
+                            </td>
+                            <td
+                              className="px-4 py-3 text-xs text-blue-600 hover:text-blue-800 cursor-pointer underline"
+                              onMouseEnter={() => {
+                                setHoveredCoords({
+                                  lat: b.pickup_latitude,
+                                  lng: b.pickup_longitude,
+                                });
+                                setHoveredEmergencyId(b.booking_id);
+                              }}
+                              onMouseLeave={() => {
+                                setHoveredCoords(null);
+                                setHoveredEmergencyId(null);
+                              }}
+                            >
+                              {b.pickup_latitude}, {b.pickup_longitude}
+                            </td>
+                          </motion.tr>
+                        ))}
+                      </motion.tbody>
+                    </motion.table>
+                  </div>
+
+                  {/* 🗺 Floating map at center (global position) */}
+                {hoveredCoords && hoveredEmergencyId && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+                    <div className="relative w-[60%] h-[50%] border-2 border-white shadow-xl rounded-xl overflow-hidden pointer-events-auto bg-white"
+                      onMouseLeave={() => {
+                        setHoveredCoords(null);
+                        setHoveredEmergencyId(null);
+                      }}
+                    >
+                      <iframe
+                        className="w-full h-full"
+                        src={`https://maps.google.com/maps?q=${hoveredCoords.lat},${hoveredCoords.lng}&z=16&output=embed`}
+                        loading="lazy"
+                        allowFullScreen
+                      ></iframe>
+                    </div>
+                  </div>
+                )}
+                </>
+              )}
+            </motion.div>
         )}
+
+
 
        
         {activeTab === 'profile' && (
@@ -2461,7 +2665,6 @@ export default function FireDashboard() {
               <div className="flex items-center justify-between mb-6">
                 <SectionHeader icon={<UserIcon />} title="Profile" />
                 <button className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center space-x-1">
-                  <PencilIcon className="h-4 w-4" /> <span>Edit Profile</span>
                 </button>
               </div>
 
@@ -2620,7 +2823,7 @@ export default function FireDashboard() {
                                 onBlur={handleBlur}
                                 required
                                 className={`w-full px-4 py-3 pl-10 border ${formErrors.licenseNumber ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
-                                placeholder="e.g., MH-AMBU-0234"
+                                placeholder="e.g., MH-FIRE-0234"
                                 maxLength="20"
                               />
                               <IdentificationIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -2668,23 +2871,23 @@ export default function FireDashboard() {
                             {formErrors.password && <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>}
                           </motion.div>
                           <motion.div variants={itemVariants}>
-                            <label htmlFor="hospitalID" className="block text-sm font-medium text-gray-700 mb-2">Hospital ID</label>
+                            <label htmlFor="fireStationId" className="block text-sm font-medium text-gray-700 mb-2">Fire Station ID</label>
                             <div className="relative">
                               <input
-                                id="hospitalID"
-                                name="hospitalID"
-                                value={form.hospitalID}
+                                id="fireStationId"
+                                name="fireStationId"
+                                value={form.fireStationId}
                                 onChange={handleChange}
                                 onBlur={handleBlur}
                                 type="number"
                                 required
-                                className={`w-full px-4 py-3 pl-10 border ${form.ErrorshospitalID ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
-                                placeholder="Enter Hospital ID"
+                                className={`w-full px-4 py-3 pl-10 border ${form.ErrorsfireStationId ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm`}
+                                placeholder="Enter Fire Station ID"
                                 min="1"
                               />
                               <BuildingOfficeIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                             </div>
-                            {form.ErrorshospitalID && <p className="mt-1 text-sm text-red-600">{form.ErrorshospitalID}</p>}
+                            {form.ErrorsfireStationId && <p className="mt-1 text-sm text-red-600">{form.ErrorsfireStationId}</p>}
                           </motion.div>
                         </div>
         

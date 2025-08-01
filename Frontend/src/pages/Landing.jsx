@@ -89,7 +89,6 @@ export default function Landing() {
           src={bgVideo}
           autoPlay
           loop
-          muted
           playsInline
           aria-hidden="true"
           role="presentation"
