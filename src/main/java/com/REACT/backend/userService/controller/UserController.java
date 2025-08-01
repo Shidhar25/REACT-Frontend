@@ -32,4 +32,11 @@ public class UserController {
         return ResponseEntity.ok(userService.updateUserProfile(updateRequest));
     }
 
+
+    @GetMapping("/{userId}")
+    public ResponseEntity<UserProfileDto> getUserById(@PathVariable Long userId){
+        log.info("Fetching user details for userId={}",userId);
+        return ResponseEntity.ok(userService.getUserById(userId));
+    }
+
 }

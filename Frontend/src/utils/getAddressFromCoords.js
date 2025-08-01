@@ -1,19 +1,22 @@
 import axios from 'axios';
 
-export async function getAddressFromCoords(lat, lng) {
+// Simple in-memory cache (outside function)
+const geocodeCache = new Map();
+const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+export const getAddressFromCoords = async (lat, lng) => {
+  const endpoint = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${API_KEY}`;
+
   try {
-    const res = await axios.get(`https://maps.googleapis.com/maps/api/geocode/json`, {
-      params: {
-        latlng: `${lat},${lng}`,
-        key: process.env.REACT_APP_GOOGLE_API_KEY,
-      },
-    });
+    const res = await fetch(endpoint);
+    const data = await res.json();
 
-    const result = res.data?.results?.[0];
-    return result ? result.formatted_address : 'Address not found';
+    if (data.status === "OK") {
+      return data.results[0]?.formatted_address || "Address not found";
+    } else {
+      throw new Error(data.error_message || "Failed to fetch address");
+    }
   } catch (err) {
-    console.error('Reverse geocoding failed:', err);
-    return 'Unable to fetch address';
+    console.error("Geocoding error:", err.message);
+    return null;
   }
-}
-
+};

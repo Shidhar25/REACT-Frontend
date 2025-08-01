@@ -19,6 +19,11 @@ public class UserServiceImpl implements UserService {
     private final com.REACT.backend.common.util.LoggedUserUtil loggedUserUtil;
     private final AppUserRepository appUserRepository;
 
+    public UserProfileDto getUserById(Long userId){
+       AppUser user =  appUserRepository.findByUserId(userId)
+               .orElseThrow(()->new ResourceNotFoundException("No such user with given id"));
+       return UserProfileDto.from(user);
+    }
     @Override
     public UserProfileDto getProfileOfCurrentUser() {
         try {
@@ -46,7 +51,10 @@ public class UserServiceImpl implements UserService {
     public UserProfileDto updateUserProfile(UpdateUserProfileDto updateRequest) {
         try {
             AppUser user = loggedUserUtil.getCurrentUser();
-
+            if(appUserRepository.existsByPhoneNumber(updateRequest.getPhoneNumber())){
+                log.error("User with same number exist");
+                throw new IllegalArgumentException("User with same Phone number exist");
+            }
             if (user == null) {
                 log.error("Logged-in user not found");
                 throw new ResourceNotFoundException("User not found");
@@ -69,4 +77,5 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("Failed to update user profile");
         }
     }
+
 }
