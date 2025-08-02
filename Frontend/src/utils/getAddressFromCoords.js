@@ -1,22 +1,25 @@
-import axios from 'axios';
+const addressCache = new Map();
 
-// Simple in-memory cache (outside function)
-const geocodeCache = new Map();
-const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 export const getAddressFromCoords = async (lat, lng) => {
-  const endpoint = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${API_KEY}`;
+  const key = `${lat},${lng}`;
+  if (addressCache.has(key)) return addressCache.get(key);
 
   try {
-    const res = await fetch(endpoint);
-    const data = await res.json();
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
+    );
+    const data = await response.json();
 
-    if (data.status === "OK") {
-      return data.results[0]?.formatted_address || "Address not found";
+    if (data.status === 'OK') {
+      const address = data.results[0]?.formatted_address || 'Unknown location';
+      addressCache.set(key, address);
+      return address;
     } else {
-      throw new Error(data.error_message || "Failed to fetch address");
+      console.error('Geocoding error:', data.status);
+      return 'Location unavailable';
     }
-  } catch (err) {
-    console.error("Geocoding error:", err.message);
-    return null;
+  } catch (error) {
+    console.error('Geocoding failed:', error);
+    return 'Location error';
   }
 };

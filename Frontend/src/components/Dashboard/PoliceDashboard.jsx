@@ -1,7 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useNavigate } from 'react-router-dom';
+import reactLogo from '../../assets/react-logo.png';
+import PoliceAdmin from '../../assets/policeAdmin.png';
 import { motion } from 'framer-motion'; // Import motion
+import StationMap from '../Helper/StationMap';
+import AllStationsMap from '../Helper/AllStationMap';
+import { getAddressFromCoords } from '../../utils/getAddressFromCoords';
+import { ShieldCheck, User, Phone, Mail, Fingerprint, IdCard } from 'lucide-react';
 import {
+  BuildingOffice2Icon,
+  PencilIcon,
+  ArrowRightOnRectangleIcon,
+  ClipboardDocumentCheckIcon,
+  UserGroupIcon,
+  HomeIcon,
   ChartBarSquareIcon,
   BellAlertIcon,
   ClockIcon,
@@ -21,6 +33,12 @@ import {
   CheckCircleIcon, // For success message icon
   XCircleIcon // For error message icon
 } from '@heroicons/react/24/outline';
+
+import {
+  Bars3BottomLeftIcon,
+  ExclamationCircleIcon,
+  UserCircleIcon,
+} from '@heroicons/react/24/outline';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -33,6 +51,7 @@ function decodeJWT(token) {
     return {};
   }
 }
+
 
 // Framer Motion Variants for animations
 const containerVariants = {
@@ -64,6 +83,13 @@ const headerVariants = {
   visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: "easeOut" } },
 };
 
+<motion.div
+  className="border-b border-gray-300 bg-police-tint"
+  initial={{ y: -10, opacity: 0 }}
+  animate={{ y: 0, opacity: 1 }}
+  transition={{ duration: 0.3 }}
+></motion.div>
+
 function SectionHeader({ icon, title }) {
   return (
     <motion.h2
@@ -90,15 +116,16 @@ export default function PoliceDashboard() {
   });
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [profileData, setProfileData] = useState({
-    name: 'Officer John Smith',
-    badge: 'P-2024-001',
-    rank: 'Senior Officer',
-    department: 'Patrol Division',
-    experience: '8 years',
-    email: 'john.smith@police.gov',
-    phone: '+1 (555) 123-4567'
-  });
+    const [profileData, setProfileData] = useState({
+  id: '',
+  fullName: '',
+  email: '',
+  phoneNumber: '',
+  governmentId: ''
+});
+
+const [enrichedEmergencies, setEnrichedEmergencies] = useState([]);
+  const [stations, setStations] = useState([]);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState(null);
   const [reportStationId, setReportStationId] = useState('');
@@ -111,6 +138,20 @@ export default function PoliceDashboard() {
   const [dashboardStats, setDashboardStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState('');
+  const [recentCases, setRecentCases] = useState([]);
+  const [recentEmergencies, setRecentEmergencies] = useState([]);
+const [requestingUsers, setRequestingUsers] = useState({});
+const [emergenciesLoading, setEmergenciesLoading] = useState(false);
+const [emergenciesError, setEmergenciesError] = useState('');
+const [hoveredCoords, setHoveredCoords] = useState(null);
+const [hoveredEmergencyId, setHoveredEmergencyId] = useState(null);
+const [lookupId, setLookupId] = useState('');
+const [lookupResult, setLookupResult] = useState(null);
+const [lookupError, setLookupError] = useState(null);
+const [lookupLoading, setLookupLoading] = useState(false);
+
+
+  
 
   // New state for police officer functionality
   const [officers, setOfficers] = useState([]);
@@ -124,6 +165,56 @@ export default function PoliceDashboard() {
   const [stationOfficers, setStationOfficers] = useState([]);
   const [stationOfficersLoading, setStationOfficersLoading] = useState(false);
   const [stationOfficersError, setStationOfficersError] = useState('');
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [reportIdError, setReportIdError] = useState(''); // Specific error for report input
+const [selectedStation, setSelectedStation] = useState(null);
+const [stationDetailLoading, setStationDetailLoading] = useState(false);
+const [stationDetailError, setStationDetailError] = useState(null);
+  const [stationId, setStationId] = useState(null); // Set this from somewhere
+    const [profileName, setProfileName] = useState(''); // Add this state
+    const [emergencies, setEmergencies] = useState([]);
+    const [stationsWithAddress, setStationsWithAddress] = useState([]);
+
+useEffect(() => {
+  const enrich = async () => {
+    const result = await Promise.all(
+      stations.map(async (station) => ({
+        ...station,
+        address: await getAddressFromCoords(station.latitude, station.longitude),
+      }))
+    );
+    setStationsWithAddress(result);
+  };
+
+  if (stations.length) enrich();
+}, [stations]);
+
+{enrichedEmergencies.map((em) => (
+  <div key={em.id}>
+    <div className="text-sm text-gray-600 mb-1">
+      <span className="font-medium text-gray-800">Pickup Location:</span>{' '}
+      {enrichedEmergencies.find(e => e.id === em.id)?.pickup_address || `${em.pickup_latitude}, ${em.pickup_longitude}`}
+    </div>
+  </div>
+))}
+
+
+useEffect(() => {
+  const enrich = async () => {
+    const result = await Promise.all(
+      emergencies.map(async (em) => {
+        const address = await getAddressFromCoords(em.pickup_latitude, em.pickup_longitude);
+        return { ...em, pickup_address: address };
+      })
+    );
+    setEnrichedEmergencies(result);
+  };
+
+  if (emergencies.length) enrich();
+}, [emergencies]);
+
+
+
 
   // New state for form validation errors
   const [formErrors, setFormErrors] = useState({
@@ -132,12 +223,135 @@ export default function PoliceDashboard() {
     longitude: '',
     availableOfficers: ''
   });
-  const [reportIdError, setReportIdError] = useState(''); // Specific error for report input
 
   // Regex for validation
   const latRegex = /^-?([1-8]?\d(\.\d+)?|90(\.0+)?)$/;
   const lonRegex = /^-?((1?[0-7]?\d(\.\d+)?)|180(\.0+)?)$/;
 
+    useEffect(() => {
+    // Fetch profile name from new endpoint
+    const jwt = localStorage.getItem('jwt');
+    if (!jwt) return;
+    fetch('http://localhost:8080/api/user/me', {
+      headers: { 'Authorization': `Bearer ${jwt}` }
+    })
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setProfileName(data.fullName))
+      .catch(() => setProfileName('A'));
+  }, []);
+
+  const handleFetchById = () => {
+  const jwt = localStorage.getItem('jwt');
+  if (!jwt || !lookupId) return;
+
+  setLookupLoading(true);
+  setLookupError(null);
+  setLookupResult(null);
+
+  fetch(`http://localhost:8080/police/station/${lookupId}`, {
+    headers: { Authorization: `Bearer ${jwt}` }
+  })
+    .then(res => res.ok ? res.json() : Promise.reject('Not found'))
+    .then(data => setLookupResult(data))
+    .catch(err => {
+      console.error('Lookup failed:', err);
+      setLookupError('Station not found or server error.');
+    })
+    .finally(() => setLookupLoading(false));
+};
+
+
+  useEffect(() => {
+    const jwt = localStorage.getItem('jwt');
+    if (!jwt) return;
+
+    fetch('http://localhost:8080/police/station/all', {
+      headers: { Authorization: `Bearer ${jwt}` }
+    })
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setStations(data))
+      .catch(err => {
+        console.error('Failed to fetch stations:', err);
+        toast.error('Failed to fetch stations.');
+      });
+  }, []);
+
+
+useEffect(() => {
+  if (!selectedStationId) return;
+
+  const jwt = localStorage.getItem('jwt');
+  setStationDetailLoading(true);
+  setStationDetailError(null);
+
+  fetch(`http://localhost:8080/police/station/${selectedStationId}`, {
+    headers: { Authorization: `Bearer ${jwt}` }
+  })
+    .then(res => res.ok ? res.json() : Promise.reject('Fetch failed'))
+    .then(data => setSelectedStation(data))
+    .catch(err => {
+      console.error('Error fetching station by ID:', err);
+      setStationDetailError('Failed to load station details.');
+    })
+    .finally(() => setStationDetailLoading(false));
+}, [selectedStationId]);
+
+
+
+
+useEffect(() => {
+  if (activeTab === 'overview' || activeTab === 'emergency') {
+    setEmergenciesLoading(true);
+    setEmergenciesError('');
+    const jwt = localStorage.getItem('jwt');
+    if (!jwt) {
+      setEmergenciesError('Authentication required to view emergencies.');
+      setEmergenciesLoading(false);
+      return;
+    }
+
+    fetch('http://localhost:8080/booking/police', {
+      headers: { Authorization: `Bearer ${jwt}` }
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({ message: 'Failed to parse error response.' }));
+          throw new Error(errorData.message || 'Failed to fetch emergencies');
+        }
+        return res.json();
+      })
+      .then(async (data) => {
+        const pending = data.filter(e => e.status !== 'COMPLETED');
+        const completed = data.filter(e => e.status === 'COMPLETED');
+        const all = [...pending, ...completed];
+        setRecentEmergencies(all);
+
+        // Get user info for each requester
+        const ids = [...new Set(all.map(e => e.requested_by_user_id))];
+        const userMap = {};
+        await Promise.all(ids.map(async id => {
+          try {
+            const r = await fetch(`http://localhost:8080/api/user/${id}`, {
+              headers: { Authorization: `Bearer ${jwt}` }
+            });
+            const d = await r.json();
+            userMap[id] = { name: d.fullName, email: d.email };
+          } catch {
+            userMap[id] = { name: 'Unknown', email: '-' };
+          }
+        }));
+        setRequestingUsers(userMap);
+      })
+      .catch(err => {
+        setEmergenciesError(err.message || 'Could not load emergencies.');
+      })
+      .finally(() => setEmergenciesLoading(false));
+  }
+}, [activeTab]);
+
+useEffect(() => { 
+  console.log("activeTab changed to:", activeTab);
+},[activeTab])
 
   useEffect(() => {
     setStatsLoading(true);
@@ -161,40 +375,54 @@ export default function PoliceDashboard() {
       })
       .finally(() => setStatsLoading(false));
   }, []);
+  const ProfileItem = ({ icon, label, value }) => (
+  <div className="flex items-center space-x-3 pt-2">
+    <div className="w-5 h-5">{icon}</div>
+    <div className="flex justify-between w-full">
+      <span className="text-gray-500">{label}:</span>
+      <span className="font-medium text-gray-800">{value}</span>
+    </div>
+  </div>
+);
+
+
+
+
+
+  useEffect(() => {
+    // Fetch profile name from new endpoint
+    const jwt = localStorage.getItem('jwt');
+    if (!jwt) return;
+    fetch('http://localhost:8080/api/user/me', {
+      headers: { 'Authorization': `Bearer ${jwt}` }
+    })
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setProfileName(data.fullName))
+      .catch(() => setProfileName('A'));
+  }, []);
 
   // Fetch profile data when profile tab is active
-  useEffect(() => {
-    if (activeTab === 'profile') {
+  useEffect(() => {    
       fetchPoliceOfficerProfile();
-    }
-  }, [activeTab]);
+  }, []);
 
   // Fetch emergency history when emergencies tab is active
-  useEffect(() => {
-    if (activeTab === 'emergencies') {
+  // useEffect(() => {
+  //   if (activeTab === 'emergency') {
+  //     console.log('activeTab', activeTab)
+  //     fetchEmergencyHistory();
+  //   }
+  // }, [activeTab]);
+
+   useEffect(() => {
       fetchEmergencyHistory();
-    }
-  }, [activeTab]);
+  }, []);
 
-  // Mock station ranking data - (Retained for display purposes, but consider fetching from API)
-  const stationRankings = [
-    { name: 'Central Police Station', score: 95, officers: 25, cases: 156, responseTime: '3.2 min' },
-    { name: 'North District Station', score: 92, officers: 18, cases: 134, responseTime: '3.8 min' },
-    { name: 'South Station', score: 88, officers: 22, cases: 142, responseTime: '4.1 min' },
-    { name: 'East Police Station', score: 85, officers: 15, cases: 98, responseTime: '4.5 min' },
-    { name: 'West District', score: 82, officers: 20, cases: 127, responseTime: '4.8 min' },
-    { name: 'Downtown Station', score: 78, officers: 30, cases: 189, responseTime: '5.2 min' }
-  ];
+  
 
-  // Mock recent cases - (Retained for display purposes, but consider fetching from API)
-  const recentCases = [
-    { id: 'C-2024-001', type: 'Traffic Violation', status: 'Resolved', time: '2 hours ago', location: 'Main Street' },
-    { id: 'C-2024-002', type: 'Domestic Dispute', status: 'In Progress', time: '4 hours ago', location: 'Oak Avenue' },
-    { id: 'C-2024-003', type: 'Burglary', status: 'Under Investigation', time: '6 hours ago', location: 'Park Lane' },
-    { id: 'C-2024-004', type: 'Assault', status: 'Resolved', time: '8 hours ago', location: 'Downtown Area' },
-    { id: 'C-2024-005', type: 'Traffic Accident', status: 'In Progress', time: '10 hours ago', location: 'Highway 101' }
-  ];
 
+
+ 
   // --- Validation Logic for Station Form ---
   const validateFormField = (name, value) => {
     let error = '';
@@ -351,7 +579,7 @@ export default function PoliceDashboard() {
     }
   };
 
-  const fetchEmergencyHistory = async () => {
+const fetchEmergencyHistory = async () => {
     setEmergencyLoading(true);
     setEmergencyError('');
     const token = localStorage.getItem('jwt') || localStorage.getItem('token');
@@ -370,6 +598,7 @@ export default function PoliceDashboard() {
       });
       if (res.ok) {
         const result = await res.json();
+         console.log('🚨 Emergency History:', result); 
         setEmergencyHistory(result);
         if (result.length === 0) {
             setEmergencyError('No assignment history found.');
@@ -389,6 +618,8 @@ export default function PoliceDashboard() {
       setEmergencyLoading(false);
     }
   };
+
+
 
   // Function to fetch all police officers
   const fetchAllOfficers = async () => {
@@ -525,12 +756,13 @@ export default function PoliceDashboard() {
     }
   };
 
+
   const fetchPoliceOfficerProfile = async () => {
     setProfileLoading(true);
     setProfileError(null);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8080/police-officer/v1/me', {
+      const token = localStorage.getItem('jwt') || localStorage.getItem('token');
+      const response = await fetch('http://localhost:8080/api/user/me', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -538,17 +770,17 @@ export default function PoliceDashboard() {
         },
       });
 
+
       if (response.ok) {
         const data = await response.json();
+        console.log(data)
         setProfileData({
-          name: data.name || 'Officer Name',
-          badge: data.badgeNumber || 'N/A',
-          rank: data.rank || 'N/A',
-          department: data.department || 'N/A',
-          experience: data.experience || 'N/A',
-          email: data.email || 'N/A',
-          phone: data.phone || 'N/A'
-        });
+        id: data.id,
+        fullName: data.fullName,
+        email: data.email,
+        phoneNumber: data.phoneNumber,
+        governmentId: data.governmentId
+      });
       } else {
         const errorData = await response.json();
         setProfileError(errorData.message || 'Failed to fetch profile data');
@@ -589,106 +821,138 @@ export default function PoliceDashboard() {
     </motion.div>
   );
 
-  const StatCard = ({ title, value, subtitle, Icon }) => (
-    <motion.div
-      className={`bg-white p-6 rounded-lg shadow-md text-gray-800 relative overflow-hidden flex items-center justify-between`}
-      variants={cardVariants}
-      initial="hidden"
-      animate="visible"
-      whileHover="hover"
+ const StatCard = ({ title, value, subtitle, icon, bgColorClass = "bg-white" }) => {
+  return (
+    <div
+      className={`rounded-xl p-5 shadow-sm border border-gray-200 flex items-center justify-between ${bgColorClass}`}
     >
-      <div className="relative z-10">
-        <motion.div
-          className="text-4xl text-blue-600 opacity-75"
-          initial={{ rotate: 0 }}
-          whileHover={{ rotate: 8 }}
-          transition={{ duration: 0.2 }}
-        >
-          <Icon className="h-10 w-10" />
-        </motion.div>
+      {/* Icon */}
+      <div className="flex items-center justify-center h-12 w-12 rounded-lg bg-white shadow-inner">
+        {icon}
       </div>
-      <div className="text-right relative z-10">
-        <h3 className="text-3xl font-bold">{value}</h3>
-        <p className="text-sm opacity-90">{title}</p>
-        {subtitle && <p className="text-xs opacity-80">{subtitle}</p>}
+
+      {/* Text */}
+      <div className="text-right ml-4">
+        <p className="text-2xl font-semibold text-gray-800">{value}</p>
+        <p className="text-sm text-gray-500">{title}</p>
+        {subtitle && <p className="text-xs text-gray-400">{subtitle}</p>}
       </div>
-      <motion.div
-        className="absolute inset-0 bg-gray-100 opacity-0 group-hover:opacity-70 transition-opacity duration-300 rounded-lg pointer-events-none"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 0 }}
-        whileHover={{ opacity: 0.7 }}
-      ></motion.div>
-    </motion.div>
+    </div>
   );
+};
+
 
   const jwt = localStorage.getItem('jwt');
   const userInfo = decodeJWT(jwt);
+ 
 
   return (
-    <div className="min-h-screen bg-gray-50">
+<div className="min-h-screen bg-[#EAF3FA] font-inter text-gray-800">
+      {/* Google Fonts Preconnect and Import (Add this to your public/index.html or a global CSS file) */}
+      {/* For demonstration, added directly here. In a real project, use <link> in HTML or @import in global CSS. */}
+      <style>
+        {`
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+          .font-inter {
+            font-family: 'Inter', sans-serif;
+          }
+        `}
+      </style>
       <ToastContainer position="bottom-right" autoClose={3000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
 
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">Police Dashboard</h1>
-              <p className="text-gray-500 mt-1">Law Enforcement Management System</p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm text-gray-600">Welcome, {profileData.name.split(' ')[1]}</p>
-                <p className="text-xs text-gray-500">Last updated: {new Date().toLocaleTimeString()}</p>
-              </div>
-              <button
-                  onClick={() => {
-                    localStorage.removeItem('jwt');
-                    navigate('/login');
-                  }}
-                  className="text-gray-600 hover:text-gray-800 text-sm font-medium"
-                >
-                  Logout
-                </button>
-              <button
-                onClick={() => setActiveTab('profile')}
-                className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold hover:bg-blue-600 transition-all duration-200 shadow-md"
-              >
-                <UserIcon className="h-6 w-6" />
-              </button>
-            </div>
-          </div>
-        </div>
+<div className=" bg-police-tint">
+  {/* Header Top Bar */}
+  <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+    
+    {/* Left - Logo + Title */}
+    <div className="flex items-center gap-4">
+      <img
+        src={reactLogo}
+        alt="REACT Logo"
+        className="h-14 w-14 object-contain rounded-xl bg-white p-2 shadow-sm"
+      />
+      <div>
+        <h1 className="text-xl font-semibold text-police-dark">Police Admin Dashboard</h1>
+        <p className="text-sm text-police-subtle">Law Enforcement Management System</p>
+      </div>
+    </div>
+
+    {/* Right - User Info & Actions */}
+    <div className="flex items-center gap-6">
+      
+      {/* User Info */}
+      <div className="text-right">
+        <p className="text-sm text-gray-700">Welcome {profileData.fullName}</p>
+        <p className="text-xs text-gray-500">Updated: {new Date().toLocaleTimeString()}</p>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="bg-white border-b shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4">
-          <nav className="flex space-x-8">
-            {[
-              { id: 'overview', name: 'Overview', Icon: ChartBarSquareIcon },
-              { id: 'stations', name: 'Stations', Icon: BuildingOfficeIcon },
-              { id: 'officers', name: 'Officers', Icon: ShieldCheckIcon },
-              { id: 'emergencies', name: 'Emergencies', Icon: BellAlertIcon },
-              { id: 'reports', name: 'Reports', Icon: ClipboardDocumentListIcon },
-              { id: 'profile', name: 'Profile', Icon: UserIcon }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300'
-                }`}
-              >
-                <tab.Icon className="inline h-5 w-5 mr-2 align-middle" />
-                {tab.name}
-              </button>
-            ))}
-          </nav>
-        </div>
+      {/* Profile Image */}
+      <div
+        onClick={() => setActiveTab('profile')}
+        title="Go to Profile"
+        className="cursor-pointer"
+      >
+        <img
+          src={PoliceAdmin} // 🔁 Replace with actual police admin avatar
+          alt="Admin"
+          className="h-10 w-10 rounded-full object-cover border-2 border-white shadow"
+        />
       </div>
+
+      {/* Icon Buttons */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => navigate('/')}
+          title="Home"
+          className="text-gray-600 hover:text-blue-600 transition"
+        >
+          <HomeIcon className="h-6 w-6" />
+        </button>
+        <button
+          onClick={() => {
+            localStorage.removeItem('jwt');
+            navigate('/login');
+          }}
+          title="Logout"
+          className="text-red-600 hover:text-red-800 transition"
+        >
+          <ArrowRightOnRectangleIcon className="h-6 w-6" />
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+
+      {/* Navbar - Police Capsule Style */}
+<div className="w-full flex justify-center my-6">
+  <nav className="bg-[#e4f1fd] border border-blue-100 rounded-full shadow-md px-4 py-2 flex space-x-4 overflow-x-auto max-w-5xl">
+    {[
+      { id: 'overview', name: 'Overview', icon: <Bars3BottomLeftIcon className="h-5 w-5" /> },
+      { id: 'emergency', name: 'Emergency', icon: <ExclamationCircleIcon className="h-5 w-5" /> },
+      { id: 'stations', name: 'Station', icon: <BuildingOffice2Icon className="h-5 w-5" /> },
+      { id: 'officers', name: 'Officers', icon: <UserGroupIcon className="h-5 w-5" /> },
+      { id: 'profile', name: 'Profile', icon: <UserCircleIcon className="h-5 w-5" /> },
+    
+    ].map((tab) => (
+      <motion.button
+        key={tab.id}
+        onClick={() => setActiveTab(tab.id)}
+        className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
+          ${
+            activeTab === tab.id
+              ? 'bg-blue-100 text-blue-700 border-blue-300'
+              : 'text-gray-600 border-transparent hover:bg-blue-50 hover:text-blue-600'
+          }`}
+      >
+        {tab.icon}
+        {tab.name}
+      </motion.button>
+    ))}
+  </nav>
+</div>
 
       {/* Main Content */}
       <motion.div
@@ -699,177 +963,526 @@ export default function PoliceDashboard() {
       >
         {activeTab === 'overview' && (
           <motion.div className="space-y-8" variants={itemVariants}>
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {statsLoading ? (
-                <motion.div className="col-span-4 text-center py-8 text-blue-600 font-semibold" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>Loading statistics...</motion.div>
-              ) : statsError ? (
-                <motion.div className="col-span-4 text-center py-8 text-red-600 font-semibold" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>{statsError}</motion.div>
-              ) : dashboardStats ? (
-                <>
+
+            {/* Quick Actions */}
+            <div>
+              <SectionHeader icon={<ClipboardDocumentCheckIcon />} title="Quick Actions" />
+              
+              <motion.div 
+                initial="hidden"
+                animate="visible"
+                variants={{
+                  hidden: { opacity: 0, y: 20 },
+                  visible: {
+                    opacity: 1,
+                    y: 0,
+                    transition: { staggerChildren: 0.05, delayChildren: 0.2 }
+                  },
+                }}
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              >
+                {[
+                  {
+                    title: "Create Station",
+                    description: "Add a new police station",
+                    Icon: PlusIcon,
+                    onClick: () => setActiveTab('create-station')
+                  },
+                  {
+                    title: "View Emergencies",
+                    description: "Monitor active emergencies",
+                    Icon: BellAlertIcon,
+                    onClick: () => setActiveTab('emergencies')
+                  },
+                  {
+                    title: "Manage Officers",
+                    description: "View and manage police officers",
+                    Icon: ShieldCheckIcon,
+                    onClick: () => setActiveTab('officers')
+                  },
+                  {
+                    title: "My Profile",
+                    description: "Update personal information",
+                    Icon: UserIcon,
+                    onClick: () => setActiveTab('profile')
+                  }
+                ].map(({ title, description, Icon, onClick }, index) => (
+                  <motion.div
+                    key={index}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="bg-white border border-gray-200 rounded-2xl shadow-sm p-5 cursor-pointer transition duration-200"
+                    onClick={onClick}
+                  >
+                    <div className="flex items-center gap-4 mb-3">
+                      <Icon className="h-6 w-6 text-gray-700" />
+                      <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+                    </div>
+                    <p className="text-sm text-gray-500">{description}</p>
+                  </motion.div>
+                ))}
+              </motion.div>
+            </div>
+
+           {/* Statistics Cards */}
+            {statsLoading ? (
+              <p className="text-gray-500 text-center">Loading stats...</p>
+            ) : statsError ? (
+              <p className="text-red-500 text-center">Error: {statsError}</p>
+            ) : dashboardStats ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Total Stations */}
+                <motion.div
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                >
                   <StatCard
                     title="Total Stations"
                     value={dashboardStats.total_police_stations}
                     subtitle="Active police stations"
-                    Icon={BuildingOfficeIcon}
+                    icon={<BuildingOfficeIcon className="h-6 w-6 text-indigo-600" />}
+                    bgColorClass="bg-gradient-to-tr from-indigo-50 to-white"
                   />
+                </motion.div>
+
+                {/* Total Officers */}
+                <motion.div
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                >
                   <StatCard
                     title="Total Officers"
                     value={dashboardStats.total_police_officers}
                     subtitle="On duty officers"
-                    Icon={ShieldCheckIcon}
+                    icon={<UserGroupIcon className="h-6 w-6 text-blue-600" />}
+                    bgColorClass="bg-gradient-to-tr from-blue-50 to-white"
                   />
+                </motion.div>
+
+                {/* Service Bookings */}
+                <motion.div
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                >
                   <StatCard
-                    title="Police Service Bookings"
+                    title="Service Bookings"
                     value={dashboardStats.police_service_bookings}
                     subtitle="Today's calls"
-                    Icon={BellAlertIcon}
+                    icon={<BellAlertIcon className="h-6 w-6 text-rose-500" />}
+                    bgColorClass="bg-gradient-to-tr from-rose-50 to-white"
                   />
+                </motion.div>
+
+                {/* Avg Response Time */}
+                <motion.div
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                >
                   <StatCard
-                    title="Avg Completion Time"
-                    value={dashboardStats.average_completion_time_minutes + ' min'}
+                    title="Avg Response Time"
+                    value={`${dashboardStats.average_completion_time_minutes} min`}
                     subtitle="Emergency response"
-                    Icon={ClockIcon}
+                    icon={<ClockIcon className="h-6 w-6 text-gray-600" />}
+                    bgColorClass="bg-gradient-to-tr from-gray-100 to-white"
                   />
-                </>
-              ) : null}
-            </div>
-
-            {/* Quick Actions */}
-            <div>
-              <SectionHeader icon={<ClipboardDocumentListIcon />} title="Quick Actions" />
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <QuickActionCard
-                  title="Create Station"
-                  description="Add a new police station"
-                  Icon={PlusIcon}
-                  onClick={() => setActiveTab('create-station')}
-                />
-                <QuickActionCard
-                  title="View Emergencies"
-                  description="Monitor active emergencies"
-                  Icon={BellAlertIcon}
-                  onClick={() => setActiveTab('emergencies')}
-                />
-                <QuickActionCard
-                  title="Manage Officers"
-                  description="View and manage police officers"
-                  Icon={ShieldCheckIcon}
-                  onClick={() => setActiveTab('officers')}
-                />
-                <QuickActionCard
-                  title="Generate Reports"
-                  description="Create incident reports"
-                  Icon={ClipboardDocumentListIcon}
-                  onClick={() => setActiveTab('reports')}
-                />
-                <QuickActionCard
-                  title="Live Map"
-                  description="View real-time locations"
-                  Icon={MapIcon}
-                  onClick={() => toast.info('Map feature coming soon!')} // Placeholder action
-                />
-                <QuickActionCard
-                   title="Emergency Contacts"
-                   description="Quick contact list"
-                   Icon={PhoneIcon}
-                   onClick={() => toast.info('Emergency contacts feature coming soon!')}
-                 />
-                 <QuickActionCard
-                   title="My Profile"
-                   description="Update personal information"
-                   Icon={UserIcon}
-                   onClick={() => setActiveTab('profile')}
-                 />
+                </motion.div>
               </div>
-            </div>
+            ) : (
+              <p className="text-gray-500 text-center">No stats available.</p>
+            )}
 
-            {/* Recent Activity */}
-             <motion.div className="bg-white rounded-lg shadow-md p-6" variants={itemVariants}>
-               <h3 className="text-xl font-semibold text-gray-800 mb-4">Recent Activity</h3>
-               <div className="space-y-4">
-                 {[
-                   { time: '2 min ago', action: 'New emergency call received', location: 'Downtown Area' },
-                   { time: '5 min ago', action: 'Officer dispatched', location: 'Central Station' },
-                   { time: '12 min ago', action: 'Station status updated', location: 'North District' },
-                   { time: '18 min ago', action: 'Report generated', location: 'South Station' }
-                 ].map((activity, index) => (
-                   <motion.div key={index} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors" variants={itemVariants}>
-                     <div>
-                       <p className="text-sm font-medium text-gray-900">{activity.action}</p>
-                       <p className="text-xs text-gray-500">{activity.location}</p>
-                     </div>
-                     <span className="text-xs text-gray-400">{activity.time}</span>
-                   </motion.div>
-                 ))}
-               </div>
-             </motion.div>
+            
 
-             {/* Recent Cases */}
-             <motion.div className="bg-white rounded-lg shadow-md p-6" variants={itemVariants}>
-               <h3 className="text-xl font-semibold text-gray-800 mb-4">Recent Cases</h3>
-               <div className="space-y-3">
-                 {recentCases.map((case_, index) => (
-                   <motion.div key={index} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors" variants={itemVariants}>
-                     <div className="flex items-center space-x-3">
-                       <div className={`w-3 h-3 rounded-full ${
-                         case_.status === 'Resolved' ? 'bg-green-500' :
-                         case_.status === 'In Progress' ? 'bg-amber-500' : 'bg-red-500'
-                       }`}></div>
-                       <div>
-                         <p className="text-sm font-medium text-gray-900">{case_.id}</p>
-                         <p className="text-xs text-gray-500">{case_.type} • {case_.location}</p>
-                       </div>
-                     </div>
-                     <div className="text-right">
-                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                         case_.status === 'Resolved' ? 'bg-green-100 text-green-800' :
-                         case_.status === 'In Progress' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
-                       }`}>
-                         {case_.status}
-                       </span>
-                       <p className="text-xs text-gray-400 mt-1">{case_.time}</p>
-                     </div>
-                   </motion.div>
-                 ))}
-               </div>
-             </motion.div>
+            
+            {/* Recent Emergencies */}
+              <div className="mt-12 space-y-10">
+                <SectionHeader
+                  icon={<ExclamationCircleIcon className="h-6 w-6 text-primary" />}
+                  title="Recent Emergencies"
+                />
+
+                {emergenciesLoading ? (
+                  <motion.div className="text-center py-6 text-primary font-medium" variants={itemVariants}>
+                    Loading emergencies...
+                  </motion.div>
+                ) : emergenciesError ? (
+                  <motion.div className="text-center py-6 text-red-600 font-medium" variants={itemVariants}>
+                    {emergenciesError}
+                  </motion.div>
+                ) : recentEmergencies.length === 0 ? (
+                  <motion.div className="text-center py-6 text-gray-400" variants={itemVariants}>
+                    No recent emergencies found.
+                  </motion.div>
+                ) : (
+                  <>
+                    {/* 🟡 Pending Emergencies */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-yellow-700 mb-3 flex items-center gap-2">
+                        <ExclamationCircleIcon className="h-5 w-5" />
+                        Pending Emergencies
+                      </h3>
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {recentEmergencies
+                          .filter((em) => em.status !== 'COMPLETED')
+                          .map((em) => (
+                            <motion.div
+                              key={em.booking_id}
+                              className="bg-white border border-yellow-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition"
+                              variants={itemVariants}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-semibold text-gray-700">ID: {em.booking_id}</span>
+                                <span className="text-xs font-medium px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                                  {em.status}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-600 mb-1">
+                                <span className="font-medium text-gray-800">Issue:</span> {em.issue_type}
+                              </div>
+                              <div className="text-sm text-gray-600 mb-1">
+                                <span className="font-medium text-gray-800">Victim Phone:</span>{' '}
+                                {em.victim_phone_number}
+                              </div>
+                              <div className="text-sm text-gray-600 mb-1">
+                                <span className="font-medium text-gray-800">Pickup Location:</span>{' '}
+                                {em.pickup_latitude}, {em.pickup_longitude}
+                              </div>
+                              <div className="text-sm text-gray-500 mt-2">
+                              <ClockIcon className="inline h-4 w-4 mr-1 text-gray-400" />
+                              Time :{new Date(em.created_at).toLocaleString()}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-600 mb-1">
+                              <div className="mr-3 flex items-center justify-center h-full">
+                                <UserIcon className="h-6 w-6 text-gray-400" />
+                              </div>
+                              <div className="text-left">
+                                <div className="font-medium">Requested by {requestingUsers[em.requested_by_user_id]?.name || 'Loading...'}</div>
+                                <div className="text-xs text-gray-500">{requestingUsers[em.requested_by_user_id]?.email}</div>
+                              </div>
+                            </div>
+
+                            </motion.div>
+                          ))}
+                      </div>
+                    </div>
+
+                    {/* ✅ Completed Emergencies */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-green-700 mb-3 flex items-center gap-2">
+                        <CheckCircleIcon className="h-5 w-5" />
+                        Completed Emergencies
+                      </h3>
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {recentEmergencies
+                          .filter((em) => em.status === 'COMPLETED')
+                          .map((em) => (
+                            <motion.div
+                              key={em.booking_id}
+                              className="bg-white border border-green-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition"
+                              variants={itemVariants}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-semibold text-gray-700">ID: {em.booking_id}</span>
+                                <span className="text-xs font-medium px-2 py-1 rounded-full bg-green-100 text-green-700">
+                                  {em.status}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-600 mb-1">
+                                <span className="font-medium text-gray-800">Issue:</span> {em.issue_type}
+                              </div>
+                              <div className="text-sm text-gray-600 mb-1">
+                                <span className="font-medium text-gray-800">Victim Phone:</span>{' '}
+                                {em.victim_phone_number}
+                              </div>
+<div className="text-sm text-gray-600 mb-1">
+  <span className="font-medium text-gray-800">Pickup Location:</span>{' '}
+  {
+    enrichedEmergencies.find(e => e.booking_id === em.booking_id)?.pickup_address
+    || `${em.pickup_latitude}, ${em.pickup_longitude}`
+  }
+</div>
+
+                 <div className="text-sm text-gray-500 mt-2">
+                              <ClockIcon className="inline h-4 w-4 mr-1 text-gray-400" />
+                              Time :{new Date(em.created_at).toLocaleString()}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-600 mb-1">
+                              <div className="mr-3 flex items-center justify-center h-full">
+                                <UserIcon className="h-6 w-6 text-gray-400" />
+                              </div>
+                              <div className="text-left">
+                                <div className="font-medium">Requested by {requestingUsers[em.requested_by_user_id]?.name || 'Loading...'}</div>
+                                <div className="text-xs text-gray-500">{requestingUsers[em.requested_by_user_id]?.email}</div>
+                              </div>
+                            </div>
+                            </motion.div>
+                          ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
           </motion.div>
         )}
 
-        {activeTab === 'stations' && (
-          <motion.div className="space-y-8" variants={containerVariants} initial="hidden" animate="visible">
-            <div className="flex items-center justify-between">
-              <SectionHeader icon={<BuildingOfficeIcon />} title="Police Stations" />
-              <motion.button
-                onClick={() => setActiveTab('create-station')}
-                className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-sm flex items-center gap-2"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <PlusIcon className="h-5 w-5" /> Add Station
-              </motion.button>
-            </div>
+{activeTab === 'stations' && (
+  <motion.div
+    className="space-y-8"
+    variants={containerVariants}
+    initial="hidden"
+    animate="visible"
+  >
+    {/* Header */}
+    <div className="flex items-center justify-between">
+      <SectionHeader icon={<BuildingOfficeIcon />} title="Police Stations" />
+      {!showCreateForm && (
+        <motion.button
+          onClick={() => setShowCreateForm(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200 shadow-sm flex items-center gap-2"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <PlusIcon className="h-5 w-5" /> Add Station
+        </motion.button>
+      )}
+    </div>
 
-            {/* Station List */}
-            <motion.div className="bg-white rounded-lg shadow-md" variants={itemVariants}>
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Active Stations</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {stationRankings.map((station, index) => (
-                    <motion.div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow duration-200" variants={itemVariants}>
-                      <h4 className="font-semibold text-gray-900">{station.name}</h4>
-                      <p className="text-sm text-gray-600">Officers: {station.officers}</p>
-                      <span className="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full mt-2">
-                        Active
+
+
+    {/* Main Panel */}
+    <div className="bg-white/60 backdrop-blur-lg p-6 rounded-xl shadow-md border border-gray-200 transition-shadow hover:shadow-lg">
+      {!showCreateForm ? (
+        // ▶ Station List View
+        <>
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Registered Stations</h3>
+          {stations.length === 0 ? (
+            <p className="text-sm text-gray-500">No stations found.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {stations.map((station, index) => (
+                <motion.div
+                  key={index}
+                  className="bg-white border border-blue-100 rounded-lg p-4 shadow-sm hover:shadow-md transition duration-200"
+                  variants={itemVariants}
+                >
+                  <div className="flex items-center mb-2 space-x-2">
+                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium inline-block">
+                        ID: {station.id}
                       </span>
-                    </motion.div>
-                  ))}
-                </div>
+                      <h4 className="font-semibold text-blue-800 text-sm md:text-base">{station.stationName}</h4>
+                  </div>
+                  <p className="text-sm text-gray-700 mt-1">Officers: {station.availableOfficers}</p>
+                  <p className="text-xs text-gray-500 mt-2">Lat: {station.latitude}, Lng: {station.longitude}</p>
+
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        // ▶ Create Station View
+        <motion.div variants={itemVariants}>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-800">Create Police Station</h3>
+            <button
+              onClick={() => setShowCreateForm(false)}
+              className="text-gray-500 hover:text-gray-700 flex items-center gap-1 text-sm"
+            >
+              <ArrowLeftIcon className="h-4 w-4" /> Back to Stations
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Station Name */}
+            <div>
+              <label htmlFor="stationName" className="text-sm font-medium text-gray-700">Station Name</label>
+              <input
+                type="text"
+                id="stationName"
+                name="stationName"
+                value={form.stationName}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                required
+                maxLength={100}
+                placeholder="Enter station name"
+                className={`mt-1 w-full px-3 py-2 border ${formErrors.stationName ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-blue-500 focus:border-blue-500`}
+              />
+              {formErrors.stationName && <p className="text-sm text-red-600 mt-1">{formErrors.stationName}</p>}
+            </div>
+
+            {/* Latitude & Longitude */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="latitude" className="text-sm font-medium text-gray-700">Latitude</label>
+                <input
+                  type="number"
+                  step="any"
+                  name="latitude"
+                  value={form.latitude}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  placeholder="e.g., 19.0760"
+                  required
+                  className={`mt-1 w-full px-3 py-2 border ${formErrors.latitude ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-blue-500 focus:border-blue-500`}
+                />
+                {formErrors.latitude && <p className="text-sm text-red-600 mt-1">{formErrors.latitude}</p>}
               </div>
+              <div>
+                <label htmlFor="longitude" className="text-sm font-medium text-gray-700">Longitude</label>
+                <input
+                  type="number"
+                  step="any"
+                  name="longitude"
+                  value={form.longitude}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  placeholder="e.g., 72.8777"
+                  required
+                  className={`mt-1 w-full px-3 py-2 border ${formErrors.longitude ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-blue-500 focus:border-blue-500`}
+                />
+                {formErrors.longitude && <p className="text-sm text-red-600 mt-1">{formErrors.longitude}</p>}
+              </div>
+            </div>
+
+            {/* Officers */}
+            <div>
+              <label htmlFor="availableOfficers" className="text-sm font-medium text-gray-700">Available Officers</label>
+              <input
+                type="number"
+                min="0"
+                name="availableOfficers"
+                value={form.availableOfficers}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                placeholder="e.g., 12"
+                required
+                className={`mt-1 w-full px-3 py-2 border ${formErrors.availableOfficers ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-blue-500 focus:border-blue-500`}
+              />
+              {formErrors.availableOfficers && <p className="text-sm text-red-600 mt-1">{formErrors.availableOfficers}</p>}
+            </div>
+
+            {/* Submit */}
+            <motion.button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 disabled:opacity-60 font-medium shadow-sm transition-all"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 mr-2 inline" viewBox="0 0 24 24" />
+                  Creating Station...
+                </>
+              ) : 'Create Station'}
+            </motion.button>
+          </form>
+
+          {/* Feedback Message */}
+          {message && (
+            <motion.div
+              className={`mt-4 p-3 rounded-md flex items-center gap-2 ${
+                message.includes('success')
+                  ? 'bg-green-100 text-green-700 border border-green-200'
+                  : 'bg-red-100 text-red-700 border border-red-200'
+              }`}
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              {message.includes('success') ? <CheckCircleIcon className="h-5 w-5" /> : <XCircleIcon className="h-5 w-5" />}
+              {message}
             </motion.div>
-          </motion.div>
+          )}
+        </motion.div>
+
+      )}
+    </div>
+    {stations.length > 0 && (
+  <div className="mt-8">
+    <h3 className="text-lg font-semibold text-gray-800 mb-2">📍 All Stations on Map</h3>
+    <AllStationsMap stations={stations} />
+  </div>
+)}
+
+    
+
+      {/* 🔍 Fetch Station by ID Section */}
+      <motion.div
+        className="bg-white rounded-lg shadow-md p-6 mt-10 border border-gray-100"
+        variants={itemVariants}
+      >
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Lookup Station by ID</h3>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleFetchById(); // Call below-defined handler
+          }}
+          className="space-y-4"
+        >
+          <div className="flex items-center gap-4">
+            <input
+              type="number"
+              placeholder="Enter Station ID"
+              value={lookupId}
+              onChange={(e) => setLookupId(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              required
+            />
+            <motion.button
+              type="submit"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.97 }}
+              className="bg-blue-500 text-white px-4 py-2 rounded-md shadow-md hover:bg-blue-600"
+            >
+              Fetch
+            </motion.button>
+          </div>
+        </form>
+
+        {lookupLoading && (
+          <p className="text-sm text-blue-600 mt-4 font-medium">Fetching station details...</p>
         )}
+
+        {lookupError && (
+          <p className="text-sm text-red-600 mt-4 font-medium">{lookupError}</p>
+        )}
+
+        {lookupResult && (
+          <div className="mt-6 bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-gray-700 space-y-2">
+            <div><strong>Name:</strong> {lookupResult.stationName}</div>
+            <div><strong>ID:</strong> {lookupResult.id}</div>
+            <div><strong>Latitude:</strong> {lookupResult.latitude}</div>
+            <div><strong>Longitude:</strong> {lookupResult.longitude}</div>
+            <div><strong>Available Officers:</strong> {lookupResult.availableOfficers}</div>
+          </div>
+          
+        )}
+      </motion.div>
+          {lookupResult && lookupResult.latitude && lookupResult.longitude && (
+            <div className="mt-6">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">📍 Location Preview</h4>
+              <div className="w-full h-64 rounded-lg overflow-hidden border border-blue-100 shadow">
+                <iframe
+                  title="Station Location"
+                  className="w-full h-full"
+                  loading="lazy"
+                  allowFullScreen
+                  src={`https://maps.google.com/maps?q=${lookupResult.latitude},${lookupResult.longitude}&z=15&output=embed`}
+                ></iframe>
+              </div>
+            </div>
+          )}
+
+
+  </motion.div>
+)}
 
         {activeTab === 'officers' && (
           <motion.div className="space-y-8" variants={containerVariants} initial="hidden" animate="visible">
@@ -1169,501 +1782,187 @@ export default function PoliceDashboard() {
           </motion.div>
         )}
 
-        {activeTab === 'create-station' && (
-          <motion.div className="max-w-2xl mx-auto" variants={containerVariants} initial="hidden" animate="visible">
-            <div className="bg-white p-8 rounded-lg shadow-md">
-              <div className="flex items-center justify-between mb-6">
-                <SectionHeader icon={<BuildingOfficeIcon />} title="Create Police Station" />
-                <button
-                  onClick={() => setActiveTab('stations')}
-                  className="text-gray-500 hover:text-gray-700 flex items-center gap-1"
-                >
-                  <ArrowLeftIcon className="h-4 w-4" /> Back to Stations
-                </button>
-              </div>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <motion.div variants={itemVariants}>
-                  <label htmlFor="stationId" className="block text-sm font-medium text-gray-700 mb-1">Station ID (Optional)</label>
-                  <input
-                    id="stationId"
-                    name="id"
-                    value={form.id}
-                    onChange={handleChange}
-                    type="number"
-                    min="1"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Auto-generated if empty"
-                  />
+          {activeTab === 'emergency' && (
+            <motion.div
+              className="bg-blue-50 rounded-2xl shadow-sm p-6 border border-blue-100 relative"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+            >
+              <SectionHeader icon={<ExclamationCircleIcon />} title="Emergency Monitoring" />
+
+              {emergencyLoading ? (
+                <motion.div className="text-center py-10 text-blue-600 font-medium" variants={itemVariants}>
+                  Loading emergencies...
                 </motion.div>
-
-                <motion.div variants={itemVariants}>
-                  <label htmlFor="stationName" className="block text-sm font-medium text-gray-700 mb-1">Station Name</label>
-                  <input
-                    id="stationName"
-                    name="stationName"
-                    value={form.stationName}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    placeholder="Enter station name"
-                    required
-                    maxLength="100"
-                    className={`w-full px-3 py-2 border ${formErrors.stationName ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-blue-500 focus:border-blue-500`}
-                  />
-                  {formErrors.stationName && <p className="mt-1 text-sm text-red-600">{formErrors.stationName}</p>}
+              ) : emergencyError ? (
+                <motion.div className="text-center py-10 text-red-600 font-medium" variants={itemVariants}>
+                  {emergencyError}
                 </motion.div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <motion.div variants={itemVariants}>
-                    <label htmlFor="latitude" className="block text-sm font-medium text-gray-700 mb-1">Latitude</label>
-                    <input
-                      id="latitude"
-                      name="latitude"
-                      value={form.latitude}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      placeholder="e.g., 10.5204"
-                      type="number"
-                      step="any"
-                      required
-                      min="-90"
-                      max="90"
-                      className={`w-full px-3 py-2 border ${formErrors.latitude ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-blue-500 focus:border-blue-500`}
-                    />
-                    {formErrors.latitude && <p className="mt-1 text-sm text-red-600">{formErrors.latitude}</p>}
-                  </motion.div>
-                  <motion.div variants={itemVariants}>
-                    <label htmlFor="longitude" className="block text-sm font-medium text-gray-700 mb-1">Longitude</label>
-                    <input
-                      id="longitude"
-                      name="longitude"
-                      value={form.longitude}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      placeholder="e.g., 73.8567"
-                      type="number"
-                      step="any"
-                      required
-                      min="-180"
-                      max="180"
-                      className={`w-full px-3 py-2 border ${formErrors.longitude ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-blue-500 focus:border-blue-500`}
-                    />
-                    {formErrors.longitude && <p className="mt-1 text-sm text-red-600">{formErrors.longitude}</p>}
-                  </motion.div>
-                </div>
-
-                <motion.div variants={itemVariants}>
-                  <label htmlFor="availableOfficers" className="block text-sm font-medium text-gray-700 mb-1">Available Officers</label>
-                  <input
-                    id="availableOfficers"
-                    name="availableOfficers"
-                    value={form.availableOfficers}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    placeholder="Number of officers"
-                    type="number"
-                    min="0"
-                    required
-                    className={`w-full px-3 py-2 border ${formErrors.availableOfficers ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-blue-500 focus:border-blue-500`}
-                  />
-                  {formErrors.availableOfficers && <p className="mt-1 text-sm text-red-600">{formErrors.availableOfficers}</p>}
+              ) : emergencyHistory.length === 0 ? (
+                <motion.div className="text-center py-10 text-gray-500" variants={itemVariants}>
+                  No recent emergencies found.
                 </motion.div>
+              ) : (
+                <>
+                  {/* Table */}
+                  <div className="overflow-x-auto">
+                    <motion.table
+                      className="min-w-full text-sm text-gray-800 bg-white border border-gray-200 rounded-xl overflow-hidden"
+                      initial="hidden"
+                      animate="visible"
+                      variants={containerVariants}
+                    >
+                      <motion.thead className="bg-blue-100/70" variants={itemVariants}>
+                        <tr className="text-left text-gray-800 text-sm uppercase tracking-wide">
+                          <th className="px-4 py-3 border-b">Booking ID</th>
+                          <th className="px-4 py-3 border-b">Issue</th>
+                          <th className="px-4 py-3 border-b">Status</th>
+                          <th className="px-4 py-3 border-b">Created</th>
+                          <th className="px-4 py-3 border-b">Victim Phone</th>
+                          <th className="px-4 py-3 border-b">Requested By</th>
+                          <th className="px-4 py-3 border-b">Pickup Location</th>
+                        </tr>
+                      </motion.thead>
+                      <motion.tbody className="divide-y divide-gray-100">
+                        {emergencyHistory.map((b) => (
+                          <motion.tr
+                            key={b.booking_id}
+                            className="hover:bg-blue-50 transition border-b border-gray-100 last:border-b-0"
+                            variants={itemVariants}
+                          >
+                            <td className="px-4 py-3 font-medium">{b.booking_id}</td>
+                            <td className="px-4 py-3">{b.issue_type}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                b.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                                b.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {b.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-gray-500">
+                              {new Date(b.created_at).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3">{b.victim_phone_number || '-'}</td>
+                            <td className="px-4 py-3">
+                              {requestingUsers[b.requested_by_user_id]?.name || 'Loading...'}
+                              <div className="text-xs text-gray-400">
+                                {requestingUsers[b.requested_by_user_id]?.email}
+                              </div>
+                            </td>
+                            <td
+                              className="px-4 py-3 text-blue-600 hover:text-blue-800 cursor-pointer underline"
+                              onMouseEnter={() => {
+                                setHoveredCoords({ lat: b.pickup_latitude, lng: b.pickup_longitude });
+                                setHoveredEmergencyId(b.booking_id);
+                              }}
+                              onMouseLeave={() => {
+                                setHoveredCoords(null);
+                                setHoveredEmergencyId(null);
+                              }}
+                            >
+                              {b.pickup_latitude.toFixed(4)}, {b.pickup_longitude.toFixed(4)}
+                            </td>
+                          </motion.tr>
+                        ))}
+                      </motion.tbody>
+                    </motion.table>
+                  </div>
 
-                <motion.button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-blue-500 text-white py-3 rounded-md hover:bg-blue-600 disabled:opacity-50 font-medium shadow-md transition-colors"
-                  variants={itemVariants}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin h-5 w-5 mr-3 inline" viewBox="0 0 24 24"></svg>
-                      Creating Station...
-                    </>
-                  ) : 'Create Police Station'}
-                </motion.button>
-              </form>
-
-              {message && (
-                <motion.div
-                  className={`mt-4 p-3 rounded-md flex items-center gap-2 ${
-                    message.includes('success')
-                      ? 'bg-green-100 text-green-700 border border-green-200'
-                      : 'bg-red-100 text-red-700 border border-red-200'
-                  }`}
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  {message.includes('success') ? <CheckCircleIcon className="h-5 w-5" /> : <XCircleIcon className="h-5 w-5" />}
-                  {message}
-                </motion.div>
+                  {/* Floating Map */}
+                  {hoveredCoords && hoveredEmergencyId && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+                      <div
+                        className="relative w-[60%] h-[50%] border-2 border-white shadow-xl rounded-xl overflow-hidden pointer-events-auto bg-white"
+                        onMouseLeave={() => {
+                          setHoveredCoords(null);
+                          setHoveredEmergencyId(null);
+                        }}
+                      >
+                        <iframe
+                          className="w-full h-full"
+                          src={`https://maps.google.com/maps?q=${hoveredCoords.lat},${hoveredCoords.lng}&z=16&output=embed`}
+                          loading="lazy"
+                          allowFullScreen
+                        ></iframe>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
-            </div>
-          </motion.div>
-        )}
-
-        {activeTab === 'emergencies' && (
-          <motion.div className="bg-white rounded-lg shadow-md p-6" variants={containerVariants} initial="hidden" animate="visible">
-            <SectionHeader icon={<BellAlertIcon />} title="Emergency Monitoring" />
-            {emergencyError && (
-              <motion.div
-                className="mb-4 p-3 rounded-md bg-red-100 text-red-700 border border-red-200 flex items-center gap-2"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <InformationCircleIcon className="h-5 w-5" /> {emergencyError}
-              </motion.div>
-            )}
-            {emergencyHistory && Array.isArray(emergencyHistory) && emergencyHistory.length > 0 ? (
-              <motion.div className="overflow-x-auto border border-gray-200 rounded-lg" variants={itemVariants}>
-                <motion.table className="w-full text-sm bg-white" initial="hidden" animate="visible" variants={containerVariants}>
-                  <motion.thead className="bg-gray-50" variants={itemVariants}>
-                    <tr>
-                      <th className="px-3 py-2 border-b text-left text-gray-600">Assignment ID</th>
-                      <th className="px-3 py-2 border-b text-left text-gray-600">Case Type</th>
-                      <th className="px-3 py-2 border-b text-left text-gray-600">Status</th>
-                      <th className="px-3 py-2 border-b text-left text-gray-600">Assigned At</th>
-                      <th className="px-3 py-2 border-b text-left text-gray-600">Location</th>
-                    </tr>
-                  </motion.thead>
-                  <motion.tbody className="bg-white">
-                    {emergencyHistory.map((item, idx) => (
-                      <motion.tr key={idx} className="hover:bg-gray-50 border-b border-gray-100 last:border-b-0" variants={itemVariants}>
-                        <td className="px-3 py-2">{item.assignment_id || item.id}</td>
-                        <td className="px-3 py-2">{item.case_type || item.issue_type}</td>
-                        <td className="px-3 py-2">
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            item.status === 'PENDING' ? 'bg-amber-100 text-amber-800' :
-                            item.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {item.status}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-xs text-gray-500">{item.assigned_at ? new Date(item.assigned_at).toLocaleString() : ''}</td>
-                        <td className="px-3 py-2 text-xs text-gray-500">{item.location || `${item.latitude?.toFixed(4)}, ${item.longitude?.toFixed(4)}`}</td>
-                      </motion.tr>
-                    ))}
-                  </motion.tbody>
-                </motion.table>
-              </motion.div>
-            ) : (
-              !emergencyLoading && <motion.p className="text-gray-600 mt-4" variants={itemVariants}>No assignment history data available. Click the button above to fetch.</motion.p>
-            )}
-          </motion.div>
-        )}
-
-        {activeTab === 'reports' && (
-           <motion.div className="bg-white rounded-lg shadow-md p-6" variants={containerVariants} initial="hidden" animate="visible">
-             <SectionHeader icon={<ClipboardDocumentListIcon />} title="Reports" />
-             <motion.div className="flex items-center mb-4 gap-2" variants={itemVariants}>
-               <input
-                 type="number"
-                 min="1"
-                 placeholder="Enter Station ID"
-                 value={reportStationId}
-                 onChange={e => { setReportStationId(e.target.value); setReportIdError(''); }} // Clear error on change
-                 onBlur={() => { // Validate on blur
-                   if (!reportStationId.toString().trim()) setReportIdError('Station ID is required.');
-                   else if (isNaN(Number(reportStationId)) || Number(reportStationId) <= 0) setReportIdError('Station ID must be a positive number.');
-                 }}
-                 className={`px-4 py-3 border ${reportIdError ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-48 transition-all duration-200 shadow-sm hover:shadow-md`}
-               />
-               <motion.button
-                 onClick={fetchReportStationHistory}
-                 disabled={reportLoading}
-                 className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-lg hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 shadow-lg transition-all duration-200 flex items-center gap-2 font-medium"
-                 whileHover={{ scale: 1.05, y: -2 }}
-                 whileTap={{ scale: 0.95 }}
-               >
-                 {reportLoading ? (
-                   <>
-                     <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24"></svg>
-                     Loading...
-                   </>
-                 ) : (
-                   <>
-                     <DocumentTextIcon className="h-5 w-5" /> Get Station History by ID
-                   </>
-                 )}
-               </motion.button>
-             </motion.div>
-             {reportIdError && <motion.p className="mb-4 text-sm text-red-600" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>{reportIdError}</motion.p>}
-             {reportError && (
-               <motion.div
-                 className="mb-4 p-3 rounded-md bg-red-100 text-red-700 border border-red-200 flex items-center gap-2"
-                 initial={{ opacity: 0, y: -10 }}
-                 animate={{ opacity: 1, y: 0 }}
-               >
-                 <InformationCircleIcon className="h-5 w-5" /> {reportError}
-               </motion.div>
-             )}
-             {reportStationHistory && Array.isArray(reportStationHistory) && reportStationHistory.length > 0 ? (
-               <motion.div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm" variants={itemVariants}>
-                 <motion.table className="w-full text-sm bg-white" initial="hidden" animate="visible" variants={containerVariants}>
-                   <motion.thead className="bg-gradient-to-r from-blue-500 to-blue-600" variants={itemVariants}>
-                     <tr>
-                       <th className="px-4 py-3 border-b text-left text-white font-semibold">Booking ID</th>
-                       <th className="px-4 py-3 border-b text-left text-white font-semibold">Pickup Location</th>
-                       <th className="px-4 py-3 border-b text-left text-white font-semibold">Issue Type</th>
-                       <th className="px-4 py-3 border-b text-left text-white font-semibold">Status</th>
-                       <th className="px-4 py-3 border-b text-left text-white font-semibold">Created At</th>
-                       <th className="px-4 py-3 border-b text-left text-white font-semibold">Victim Phone</th>
-                       <th className="px-4 py-3 border-b text-left text-white font-semibold">Requested By</th>
-                       <th className="px-4 py-3 border-b text-left text-white font-semibold">For Self</th>
-                       <th className="px-4 py-3 border-b text-left text-white font-semibold">Ambulance</th>
-                       <th className="px-4 py-3 border-b text-left text-white font-semibold">Police</th>
-                       <th className="px-4 py-3 border-b text-left text-white font-semibold">Fire Brigade</th>
-                       <th className="px-4 py-3 border-b text-left text-white font-semibold">Ambulance Count</th>
-                       <th className="px-4 py-3 border-b text-left text-white font-semibold">Police Count</th>
-                       <th className="px-4 py-3 border-b text-left text-white font-semibold">Fire Truck Count</th>
-                     </tr>
-                   </motion.thead>
-                   <motion.tbody className="bg-white">
-                     {reportStationHistory
-                       .sort((a, b) => {
-                         // Sort by status: PENDING first, then COMPLETED, then others
-                         const statusOrder = { 'PENDING': 1, 'COMPLETED': 2 };
-                         const aOrder = statusOrder[a.status] || 3;
-                         const bOrder = statusOrder[b.status] || 3;
-                         
-                         if (aOrder !== bOrder) {
-                           return aOrder - bOrder;
-                         }
-                         
-                         // If same status, sort by creation date (newest first)
-                         return new Date(b.created_at) - new Date(a.created_at);
-                       })
-                       .map((item, idx) => (
-                         <motion.tr 
-                           key={idx} 
-                           className={`hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition-colors duration-200 ${
-                             item.status === 'PENDING' ? 'bg-amber-50 hover:bg-amber-100' : 
-                             item.status === 'COMPLETED' ? 'bg-green-50 hover:bg-green-100' : 
-                             'hover:bg-gray-50'
-                           }`}
-                           variants={itemVariants}
-                           whileHover={{ scale: 1.01 }}
-                         >
-                           <td className="px-4 py-3 font-bold text-blue-600">{item.booking_id}</td>
-                           <td className="px-4 py-3 text-xs text-gray-500">{item.pickup_latitude?.toFixed(4)}, {item.pickup_longitude?.toFixed(4)}</td>
-                           <td className="px-4 py-3 font-medium text-gray-800">{item.issue_type}</td>
-                           <td className="px-4 py-3">
-                             <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                               item.status === 'PENDING' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
-                               item.status === 'COMPLETED' ? 'bg-green-100 text-green-800 border border-green-200' :
-                               'bg-gray-100 text-gray-800 border border-gray-200'
-                             }`}>
-                               {item.status}
-                             </span>
-                           </td>
-                           <td className="px-4 py-3 text-xs text-gray-500">{new Date(item.created_at).toLocaleString()}</td>
-                           <td className="px-4 py-3">
-                             <a href={`tel:${item.victim_phone_number}`} className="text-blue-600 hover:text-blue-800 transition-colors">
-                               {item.victim_phone_number}
-                             </a>
-                           </td>
-                           <td className="px-4 py-3">{item.requested_by_user_id}</td>
-                           <td className="px-4 py-3">
-                             <span className={`px-2 py-1 rounded text-xs font-medium ${
-                               item.is_for_self ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
-                             }`}>
-                               {item.is_for_self ? 'Yes' : 'No'}
-                             </span>
-                           </td>
-                           <td className="px-4 py-3">
-                             <span className={`px-2 py-1 rounded text-xs font-medium ${
-                               item.needs_ambulance ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'
-                             }`}>
-                               {item.needs_ambulance ? 'Yes' : 'No'}
-                             </span>
-                           </td>
-                           <td className="px-4 py-3">
-                             <span className={`px-2 py-1 rounded text-xs font-medium ${
-                               item.needs_police ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
-                             }`}>
-                               {item.needs_police ? 'Yes' : 'No'}
-                             </span>
-                           </td>
-                           <td className="px-4 py-3">
-                             <span className={`px-2 py-1 rounded text-xs font-medium ${
-                               item.needs_fire_brigade ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-600'
-                             }`}>
-                               {item.needs_fire_brigade ? 'Yes' : 'No'}
-                             </span>
-                           </td>
-                           <td className="px-4 py-3 text-center font-semibold">{item.requested_ambulance_count}</td>
-                           <td className="px-4 py-3 text-center font-semibold">{item.requested_police_count}</td>
-                           <td className="px-4 py-3 text-center font-semibold">{item.requested_fire_truck_count}</td>
-                         </motion.tr>
-                       ))}
-                   </motion.tbody>
-                 </motion.table>
-               </motion.div>
-             ) : (
-               !reportLoading && (
-                 <motion.div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300" variants={itemVariants}>
-                   <ClipboardDocumentListIcon className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                   <p className="text-gray-600 font-medium">No station history data available</p>
-                   <p className="text-gray-500 text-sm mt-1">Enter a station ID and click the button above to fetch</p>
-                 </motion.div>
-               )
-             )}
-           </motion.div>
-         )}
+            </motion.div>
+          )}
 
          {activeTab === 'profile' && (
-           <motion.div className="max-w-4xl mx-auto" variants={containerVariants} initial="hidden" animate="visible">
-             <div className="bg-white rounded-lg shadow-md p-8">
-               <div className="flex items-center justify-between mb-6">
-                 <SectionHeader icon={<UserIcon />} title="Officer Profile" />
-                 <button className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1">
-                   <PencilIcon className="h-4 w-4" /> <span>Edit Profile</span>
-                 </button>
-               </div>
+            <motion.div
+              className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+            >
+              <div className="bg-white/70 backdrop-blur-md rounded-2xl shadow-xl p-8 border border-gray-100">
+                
+                {/* Section Header */}
+                <div className="flex items-center gap-2 mb-8">
+                  <UserIcon className="text-blue-600 w-6 h-6" />
+                  <h2 className="text-xl font-bold text-gray-800">Officer Profile</h2>
+                </div>
 
-               {profileLoading && (
-                 <motion.div className="text-center py-8 text-blue-600 font-semibold" variants={itemVariants}>
-                   Loading profile data...
-                 </motion.div>
-               )}
+                {/* Loading State */}
+                {profileLoading && (
+                  <motion.div className="text-center py-10 text-blue-600 font-semibold" variants={itemVariants}>
+                    Loading profile data...
+                  </motion.div>
+                )}
 
-               {profileError && (
-                 <motion.div className="text-center py-8 text-red-600 font-semibold" variants={itemVariants}>
-                   {profileError}
-                 </motion.div>
-               )}
+                {/* Error State */}
+                {profileError && (
+                  <motion.div className="text-center py-10 text-red-600 font-semibold" variants={itemVariants}>
+                    {profileError}
+                  </motion.div>
+                )}
 
-               {!profileLoading && !profileError && (
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                 {/* Profile Information */}
-                 <motion.div variants={itemVariants}>
-                   <h3 className="text-lg font-semibold text-gray-800 mb-4">Personal Information</h3>
-                   <div className="space-y-4">
-                     <div className="flex items-center space-x-4">
-                       <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-md">
-                         <UserIcon className="h-10 w-10" />
-                       </div>
-                       <div>
-                         <h4 className="font-semibold text-gray-900">{profileData.name}</h4>
-                         <p className="text-sm text-gray-600">Badge: {profileData.badge}</p>
-                       </div>
-                     </div>
+                {/* Profile Info */}
+                {!profileLoading && !profileError && (
+                  <motion.div
+                    variants={itemVariants}
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4 }}
+                  >
+                    <div className="flex items-center space-x-8 border border-gray-200 rounded-xl p-6 bg-gradient-to-br from-white via-blue-50 to-white shadow-sm hover:shadow-md transition-shadow">
+                      
+                      {/* Profile Image */}
+                      <div className="relative w-32 h-32">
+                        <img
+                          src={PoliceAdmin} // ⛳ Replace this with your image import or fallback
+                          alt="Profile"
+                          className="w-full h-full rounded-full object-cover border-4 border-white shadow-md"
+                        />
+                        <div className="absolute -inset-1 rounded-full bg-blue-400 opacity-10 blur-lg"></div>
+                      </div>
 
-                     <div className="space-y-3 border border-gray-200 rounded-lg p-4">
-                       <div className="flex justify-between py-2 border-b border-gray-100">
-                         <span className="text-gray-600">User ID:</span>
-                         <span className="font-medium text-gray-800">{userInfo.userId || 'N/A'}</span>
-                       </div>
-                       <div className="flex justify-between py-2 border-b border-gray-100">
-                         <span className="text-gray-600">Email:</span>
-                         <span className="font-medium text-gray-800">{userInfo.sub || 'N/A'}</span>
-                       </div>
-                       <div className="flex justify-between py-2">
-                         <span className="text-gray-600">Role:</span>
-                         <span className="font-medium text-gray-800">{userInfo.role || 'N/A'}</span>
-                       </div>
-                       <div className="flex justify-between py-2 border-t border-gray-100 mt-4">
-                            <span className="text-gray-600">Rank:</span>
-                            <span className="font-medium text-gray-800">{profileData.rank || 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between py-2">
-                            <span className="text-gray-600">Department:</span>
-                            <span className="font-medium text-gray-800">{profileData.department || 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between py-2">
-                            <span className="text-gray-600">Experience:</span>
-                            <span className="font-medium text-gray-800">{profileData.experience || 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between py-2">
-                            <span className="text-gray-600">Phone:</span>
-                            <span className="font-medium text-gray-800">{profileData.phone || 'N/A'}</span>
-                        </div>
-                     </div>
-                   </div>
-                 </motion.div>
+                      {/* Profile Fields */}
+                      <div className="flex-1">
+                        <dl className="divide-y divide-gray-200 text-sm text-gray-700 space-y-3">
+                       <ProfileItem icon={<Fingerprint className="text-brand w-4 h-4" />} label="User ID" value={profileData.id} />
+<ProfileItem icon={<User className="text-brand w-4 h-4" />} label="Full Name" value={profileData.fullName} />
+<ProfileItem icon={<Mail className="text-brand w-4 h-4" />} label="Email" value={profileData.email} />
+<ProfileItem icon={<Phone className="text-brand w-4 h-4" />} label="Phone" value={profileData.phoneNumber} />
+<ProfileItem icon={<IdCard className="text-brand w-4 h-4" />} label="Govt ID" value={profileData.governmentId} />
 
-                 {/* Performance Stats */}
-                 <motion.div variants={itemVariants}>
-                   <h3 className="text-lg font-semibold text-gray-800 mb-4">Performance Statistics</h3>
-                   <div className="space-y-4">
-                     <div className="bg-gray-100 p-4 rounded-lg shadow-sm">
-                       <div className="flex items-center justify-between">
-                         <span className="text-blue-700 font-medium">Cases Handled</span>
-                         <span className="text-2xl font-bold text-blue-700">247</span>
-                       </div>
-                       <p className="text-sm text-gray-600 mt-1">This month</p>
-                     </div>
+                        </dl>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            </motion.div>
+          )}
 
-                     <div className="bg-gray-100 p-4 rounded-lg shadow-sm">
-                       <div className="flex items-center justify-between">
-                         <span className="text-green-700 font-medium">Success Rate</span>
-                         <span className="text-2xl font-bold text-green-700">94%</span>
-                       </div>
-                       <p className="text-sm text-gray-600 mt-1">Resolved cases</p>
-                     </div>
-
-                     <div className="bg-gray-100 p-4 rounded-lg shadow-sm">
-                       <div className="flex items-center justify-between">
-                         <span className="text-amber-700 font-medium">Response Time</span>
-                         <span className="text-2xl font-bold text-amber-700">3.8 min</span>
-                       </div>
-                       <p className="text-sm text-gray-600 mt-1">Average</p>
-                     </div>
-
-                     <div className="bg-gray-100 p-4 rounded-lg shadow-sm">
-                       <div className="flex items-center justify-between">
-                         <span className="text-purple-700 font-medium">Service Hours</span>
-                         <span className="text-2xl font-bold text-purple-700">1,240</span>
-                       </div>
-                       <p className="text-sm text-gray-600 mt-1">This year</p>
-                     </div>
-                   </div>
-                 </motion.div>
-               </div>
-               )}
-
-               {/* Recent Achievements */}
-               <motion.div className="mt-8" variants={itemVariants}>
-                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Recent Achievements</h3>
-                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                   <motion.div
-                     className="bg-white p-4 rounded-lg shadow-md border border-gray-200"
-                     whileHover={{ scale: 1.05 }}
-                     whileTap={{ scale: 0.98 }}
-                     variants={itemVariants}
-                   >
-                     <div className="text-2xl mb-2 text-blue-500"><TrophyIcon className="h-6 w-6" /></div>
-                     <h4 className="font-semibold text-gray-800">Officer of the Month</h4>
-                     <p className="text-sm text-gray-600 opacity-90">January 2024</p>
-                   </motion.div>
-                   <motion.div
-                     className="bg-white p-4 rounded-lg shadow-md border border-gray-200"
-                     whileHover={{ scale: 1.05 }}
-                     whileTap={{ scale: 0.98 }}
-                     variants={itemVariants}
-                   >
-                     <div className="text-2xl mb-2 text-green-500"><StarIcon className="h-6 w-6" /></div>
-                     <h4 className="font-semibold text-gray-800">Excellence Award</h4>
-                     <p className="text-sm text-gray-600 opacity-90">Community Service</p>
-                   </motion.div>
-                   <motion.div
-                     className="bg-white p-4 rounded-lg shadow-md border border-gray-200"
-                     whileHover={{ scale: 1.05 }}
-                     whileTap={{ scale: 0.98 }}
-                     variants={itemVariants}
-                   >
-                     <div className="text-2xl mb-2 text-gray-600"><ChartBarSquareIcon className="h-6 w-6" /></div>
-                     <h4 className="font-semibold text-gray-800">Perfect Attendance</h4>
-                     <p className="text-sm text-gray-600 opacity-90">6 months</p>
-                   </motion.div>
-                 </div>
-               </motion.div>
-             </div>
-           </motion.div>
-         )}
       </motion.div>
     </div>
   );
