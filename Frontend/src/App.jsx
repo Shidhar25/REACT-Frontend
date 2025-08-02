@@ -7,10 +7,12 @@ import {
   UserDashboard,
   NavigationMap,
   ForgotPassword
+  
 } from './components';
+import OAuthSuccess from './components/Auth/OAuthSuccess.jsx';  // ✅ Correct Path
 import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer } from 'react-toastify'; 
-
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import FireTruckDriverPage from './components/Driver/FireTruckDriverPage';
 import AmbulanceDriverPage from './components/Driver/AmbulanceDriverPage';
 import AdminDashboard from './components/Dashboard/AdminDashboard.jsx';
@@ -75,128 +77,73 @@ function RoleRedirectHandler() {
   return null;
 }
 
+
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <SessionReset />
-        <RoleRedirectHandler />
+    <GoogleOAuthProvider clientId="958855603907-4ih8bojnhuavs00pui3rs0b5gvutlvdq.apps.googleusercontent.com">
+      <AuthProvider>
+        <Router>
+          <SessionReset />
+          <RoleRedirectHandler />
 
-        {/* ✅ Toast notifications container */}
-        <ToastContainer position="top-right" autoClose={3000} />
+          <ToastContainer position="top-right" autoClose={3000} />
 
-        <Routes>
-          {/* Public routes */}
-          <Route path="/" element={<Landing />} />
-          <Route path="/landing" element={<Landing />} />
+          <Routes>
+            {/* Public routes */}
+            <Route path="/" element={<Landing />} />
+            <Route path="/landing" element={<Landing />} />
 
-          {/* Auth */}
-          <Route path="/login" element={
-            <PublicRoute>
-              <Login />
-            </PublicRoute>
-          } />
-          <Route path="/register" element={
-            <PublicRoute>
-              <Register />
-            </PublicRoute>
-          } />
-          <Route path="/forgot-password" element={
-            <PublicRoute>
-              <ForgotPassword />
-            </PublicRoute>
-          } />
+            {/* Auth */}
+            <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+            <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+            <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
 
-          {/* User Roles */}
-          <Route path="/user-dashboard" element={
-            <ProtectedRoute requiredRole="USER">
-              <UserDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin-dashboard" element={
-            <ProtectedRoute requiredRole="ADMIN">
-              <AdminDashboard />
-            </ProtectedRoute>
-          } />
+            {/* User Roles */}
+            <Route path="/user-dashboard" element={<ProtectedRoute requiredRole="USER"><UserDashboard /></ProtectedRoute>} />
+            <Route path="/admin-dashboard" element={<ProtectedRoute requiredRole="ADMIN"><AdminDashboard /></ProtectedRoute>} />
 
-          {/* Ambulance */}
-          <Route path="/ambulance-dashboard" element={
-            <ProtectedRoute requiredRole="AMBULANCE_DRIVER">
-              <AmbulanceDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/ambulance-admin-dashboard" element={
-            <ProtectedRoute requiredRole="AMBULANCE_ADMIN">
-              <AmbulanceDashboard />
-            </ProtectedRoute>
-          } />
+            {/* Ambulance */}
+            <Route path="/ambulance-dashboard" element={<ProtectedRoute requiredRole="AMBULANCE_DRIVER"><AmbulanceDashboard /></ProtectedRoute>} />
+            <Route path="/ambulance-admin-dashboard" element={<ProtectedRoute requiredRole="AMBULANCE_ADMIN"><AmbulanceDashboard /></ProtectedRoute>} />
 
-          {/* Fire */}
-          <Route path="/fire-dashboard" element={
-            <ProtectedRoute requiredRole="FIRE_DRIVER">
-              <FireDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/fire-admin-dashboard" element={
-            <ProtectedRoute requiredRole="FIRE_STATION_ADMIN">
-              <FireDashboard />
-            </ProtectedRoute>
-          } />
+            {/* Fire */}
+            <Route path="/fire-dashboard" element={<ProtectedRoute requiredRole="FIRE_DRIVER"><FireDashboard /></ProtectedRoute>} />
+            <Route path="/fire-admin-dashboard" element={<ProtectedRoute requiredRole="FIRE_STATION_ADMIN"><FireDashboard /></ProtectedRoute>} />
 
-          {/* Police */}
-          <Route path="/police-dashboard" element={
-            <ProtectedRoute requiredRole="POLICE_OFFICER">
-              <PoliceDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/police-admin-dashboard" element={
-            <ProtectedRoute requiredRole="POLICE_STATION_ADMIN">
-              <PoliceDashboard />
-            </ProtectedRoute>
-          } />
+            {/* Police */}
+            <Route path="/police-dashboard" element={<ProtectedRoute requiredRole="POLICE_OFFICER"><PoliceDashboard /></ProtectedRoute>} />
+            <Route path="/police-admin-dashboard" element={<ProtectedRoute requiredRole="POLICE_STATION_ADMIN"><PoliceDashboard /></ProtectedRoute>} />
 
-          {/* Driver pages */}
-          <Route path="/fire-truck-driver" element={
-            <ProtectedRoute requiredRole="FIRE_DRIVER">
-              <FireTruckDriverPage />
-            </ProtectedRoute>
-          } />
-          <Route path="/ambulance-driver" element={
-            <ProtectedRoute requiredRole="AMBULANCE_DRIVER">
-              <AmbulanceDriverPage />
-            </ProtectedRoute>
-          } />
+            {/* Driver pages */}
+            <Route path="/fire-truck-driver" element={<ProtectedRoute requiredRole="FIRE_DRIVER"><FireTruckDriverPage /></ProtectedRoute>} />
+            <Route path="/ambulance-driver" element={<ProtectedRoute requiredRole="AMBULANCE_DRIVER"><AmbulanceDriverPage /></ProtectedRoute>} />
 
-          {/* Navigation */}
-          <Route path="/navigation/:requestId" element={
-            <ProtectedRoute>
-              <NavigationMap />
-            </ProtectedRoute>
-          } />
-          <Route path="/navigation/:vehicleType/:requestId" element={
-            <ProtectedRoute>
-              <NavigationMap />
-            </ProtectedRoute>
-          } />
+            {/* Navigation */}
+            <Route path="/navigation/:requestId" element={<ProtectedRoute><NavigationMap /></ProtectedRoute>} />
+            <Route path="/navigation/:vehicleType/:requestId" element={<ProtectedRoute><NavigationMap /></ProtectedRoute>} />
 
-          {/* 404 */}
-          <Route path="*" element={
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-              <div className="text-center">
-                <h1 className="text-4xl font-bold text-gray-900 mb-4">404</h1>
-                <p className="text-gray-600 mb-8">Page not found</p>
-                <button
-                  onClick={() => window.history.back()}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Go Back
-                </button>
+            {/* OAuth2 Success Handler Route */}
+            <Route path="/oauth-success" element={<OAuthSuccess />} />
+
+            {/* 404 Route */}
+            <Route path="*" element={
+              <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="text-center">
+                  <h1 className="text-4xl font-bold text-gray-900 mb-4">404</h1>
+                  <p className="text-gray-600 mb-8">Page not found</p>
+                  <button
+                    onClick={() => window.history.back()}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Go Back
+                  </button>
+                </div>
               </div>
-            </div>
-          } />
-        </Routes>
-      </Router>
-    </AuthProvider>
+            } />
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </GoogleOAuthProvider>
   );
 }
 

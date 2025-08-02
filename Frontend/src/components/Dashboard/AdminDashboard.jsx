@@ -1,8 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { tokenUtils } from '../../services/api';
 import { MdOutlineLeaderboard, MdEmergency, MdAccessTime, MdLocationOn, MdOutlineReport, MdPhone, MdMap, MdStar, MdPerson, MdAdd } from 'react-icons/md';
 import { FaUser, FaTrophy, FaBuilding, FaClipboardList, FaMapMarkerAlt, FaRegClock, FaUserMd, FaAmbulance, FaUserShield, FaFireExtinguisher } from 'react-icons/fa';
+import { HomeIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import reactLogo from '../../assets/react-logo.png'; // Use your actual logo path
+import AmbulanceAdmin from './../../assets/AmbulanceAdmin.avif';
+import { motion } from 'framer-motion';
+
+
 
 function decodeJWT(token) {
   if (!token) return {};
@@ -498,7 +504,11 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
-  const navigate = useNavigate();
+
+  const [profileData, setProfileData] = useState({ fullName: 'Admin User' }); // Later fetch real data
+const navigate = useNavigate();
+
+
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -533,28 +543,85 @@ const AdminDashboard = () => {
   const userInfo = decodeJWT(jwt);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <header className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold text-blue-800">Admin Dashboard</h1>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onClick={handleLogout}>Logout</button>
-      </header>
-      {/* Tab Navigation */}
-      <nav className="mb-8">
-        <div className="flex gap-2 border-b-2 border-blue-100">
-          {TABS.map(tab => (
-            <button
-              key={tab.key}
-              className={`px-5 py-2 font-semibold rounded-t-md transition-all duration-200 focus:outline-none
-                ${activeTab === tab.key
-                  ? 'bg-white border-x border-t border-blue-300 border-b-0 text-blue-700 shadow-sm'
-                  : 'bg-blue-100 text-blue-500 hover:bg-blue-200'}`}
-              onClick={() => setActiveTab(tab.key)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+    <div className="min-h-screen bg-purple-50 font-inter text-gray-800">
+      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between bg-purple-50 ">
+  
+  {/* Left - Logo + Title */}
+  <div className="flex items-center gap-4">
+    <img
+      src={reactLogo}
+      alt="Logo"
+      className="h-14 w-14 object-contain rounded-xl bg-white p-2 shadow"
+    />
+    <div>
+      <h1 className="text-xl font-semibold text-purple-900">Admin Dashboard</h1>
+      <p className="text-sm text-purple-700">Overall System Administration</p>
+    </div>
+  </div>
+
+  {/* Right - User Info & Actions */}
+  <div className="flex items-center gap-6">
+    
+    {/* User Info */}
+    <div className="text-right">
+      <p className="text-sm text-gray-700">Welcome {profileData.fullName}</p>
+      <p className="text-xs text-gray-500">Updated: {new Date().toLocaleTimeString()}</p>
+    </div>
+
+    {/* Profile Image */}
+    <div
+      onClick={() => navigate('/profile')}
+      title="Go to Profile"
+      className="cursor-pointer"
+    >
+      <img
+        src={AmbulanceAdmin}
+        alt="Admin Avatar"
+        className="h-10 w-10 rounded-full object-cover border-2 border-purple-300 shadow"
+      />
+    </div>
+
+    {/* Icon Buttons */}
+    <div className="flex items-center gap-2">
+      <button
+        onClick={() => navigate('/')}
+        title="Home"
+        className="text-gray-600 hover:text-blue-600 transition"
+      >
+        <HomeIcon className="h-6 w-6" />
+      </button>
+      <button
+        onClick={handleLogout}
+        title="Logout"
+        className="text-red-600 hover:text-red-800 transition"
+      >
+        <ArrowRightOnRectangleIcon className="h-6 w-6" />
+      </button>
+    </div>
+
+  </div>
+</div>
+
+     {/* Capsule Navbar - Purple Themed */}
+    <div className="w-full flex justify-center mb-10">
+      <nav className="bg-purple-50 border border-purple-100 rounded-full shadow-md px-4 py-2 flex space-x-4 overflow-x-auto max-w-5xl">
+        {TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all transform
+              ${
+                activeTab === tab.key
+                  ? 'bg-purple-100 text-purple-700 border-purple-300 shadow-md'
+                  : 'text-gray-600 border-transparent hover:bg-purple-50 hover:text-purple-600 hover:scale-105'
+              }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </nav>
+    </div>
+
       {/* Tab Content */}
       {activeTab === 'dashboard' && (
         <>

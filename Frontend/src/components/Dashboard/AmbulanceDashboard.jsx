@@ -172,6 +172,7 @@ const [isEditing, setIsEditing] = useState(false);
   const [emergencyAddresses, setEmergencyAddresses] = useState({});
   const [hoveredCoords, setHoveredCoords] = useState(null);
   const [hoveredEmergencyId, setHoveredEmergencyId] = useState(null);
+  
   const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     const [requestingUsers, setRequestingUsers] = useState({});
 
@@ -1824,16 +1825,11 @@ const fetchAddresses = async () => {
                       </div>
                     </div>
 
-                    {/* Button - moved to bottom
+                  
                      <div className="flex justify-center mt-6">
-                    <button
-                  onClick={() => setIsEditing(true)}
-                  className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-all shadow-sm"
-                >
-                  Edit Profile
-                </button>
+                    
 
-                  </div> */}
+                  </div>
                   </motion.div>
                 )}
               </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LoginImage from '../../assets/login.png';
 import AmbulanceGif from '../../assets/background.gif';
+import { GoogleLogin } from '@react-oauth/google';
 
 const roles = [
   { value: 'USER', label: 'User (Default Requester)' },
@@ -264,57 +265,60 @@ export default function Register() {
 
   const inputClass = (name) => `w-full px-4 py-2 border ${formErrors[name] ? 'border-red-500' : 'border-gray-300'} rounded focus:outline-none focus:ring-2 focus:ring-blue-500`;
 
-  return (
-    <div className="min-h-screen relative flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 text-white overflow-hidden">
-      <style jsx>{`
-        .glow-effect {
-          box-shadow: 
+return (
+  <div className="min-h-screen relative flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 text-white overflow-hidden">
+    <style>{`
+      .glow-effect {
+        box-shadow:
+          0 0 20px rgba(59, 130, 246, 0.3),
+          0 0 40px rgba(59, 130, 246, 0.2),
+          0 0 60px rgba(59, 130, 246, 0.1),
+          0 0 80px rgba(59, 130, 246, 0.05);
+        animation: glow 3s ease-in-out infinite alternate;
+      }
+      @keyframes glow {
+        from {
+          box-shadow:
             0 0 20px rgba(59, 130, 246, 0.3),
             0 0 40px rgba(59, 130, 246, 0.2),
             0 0 60px rgba(59, 130, 246, 0.1),
             0 0 80px rgba(59, 130, 246, 0.05);
-          animation: glow 3s ease-in-out infinite alternate;
         }
-        
-        @keyframes glow {
-          from {
-            box-shadow: 
-              0 0 20px rgba(59, 130, 246, 0.3),
-              0 0 40px rgba(59, 130, 246, 0.2),
-              0 0 60px rgba(59, 130, 246, 0.1),
-              0 0 80px rgba(59, 130, 246, 0.05);
-          }
-          to {
-            box-shadow: 
-              0 0 30px rgba(59, 130, 246, 0.4),
-              0 0 60px rgba(59, 130, 246, 0.3),
-              0 0 90px rgba(59, 130, 246, 0.2),
-              0 0 120px rgba(59, 130, 246, 0.1);
-          }
+        to {
+          box-shadow:
+            0 0 30px rgba(59, 130, 246, 0.4),
+            0 0 60px rgba(59, 130, 246, 0.3),
+            0 0 90px rgba(59, 130, 246, 0.2),
+            0 0 120px rgba(59, 130, 246, 0.1);
         }
-      `}</style>
-      
-      {/* Full background GIF */}
-      <img
-        src={AmbulanceGif}
-        alt="Ambulance background"
-        className="fixed inset-0 w-full h-full object-cover object-center z-0 select-none pointer-events-none"
-        style={{ filter: 'brightness(0.3) blur(2px)', opacity: 0.4 }}
-        draggable="false"
-      />
-      
-      {/* Main container for the form */}
-      <div className="flex w-full max-w-4xl bg-white/10 rounded-xl shadow-2xl overflow-hidden relative z-10 border border-white/20 glow-effect">
-         {/* Left Image (hidden on small screens) */}
-        <div className="hidden md:flex flex-col justify-center items-center bg-white/10 p-8 w-1/2">
-           <img src={LoginImage} alt="Register Visual" className="w-64 h-64 object-contain rounded-xl shadow-md" />
-         </div>
-        
-         {/* Right Form */}
-         <div className="flex-1 flex flex-col justify-center p-8">
-          <div className="bg-white/10 p-6 rounded-lg shadow-xl w-full max-w-sm border border-gray-100 mx-auto">
-            <h2 className="text-2xl font-bold text-center mb-6 text-white">Register</h2>
-             <form onSubmit={handleSubmit} className="space-y-4">
+      }
+    `}</style>
+    <img src={AmbulanceGif} alt="Ambulance background" className="fixed inset-0 w-full h-full object-cover object-center z-0 select-none pointer-events-none" style={{ filter: 'brightness(0.3) blur(2px)', opacity: 0.4 }} draggable="false" />
+    <div className="flex w-full max-w-4xl bg-white/10 rounded-xl shadow-2xl overflow-hidden relative z-10 border border-white/20 glow-effect">
+      <div className="hidden md:flex flex-col justify-center items-center bg-white/10 p-8 w-1/2">
+        <img src={LoginImage} alt="Register Visual" className="w-64 h-64 object-contain rounded-xl shadow-md" />
+        <div className="mt-6 space-y-3">
+          <GoogleLogin
+            onSuccess={async (credentialResponse) => {
+              console.log('Google OAuth Success:', credentialResponse);
+              await handleOAuthPreFill('google', credentialResponse.credential);
+            }}
+            onError={() => console.log('Google OAuth Error')}
+            useOneTap
+          />
+          <button
+            onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/github'}
+            className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Sign up with GitHub
+          </button>
+        </div>
+      </div>
+      <div className="flex-1 flex flex-col justify-center p-8">
+        <div className="bg-white/10 p-6 rounded-lg shadow-xl w-full max-w-sm border border-gray-100 mx-auto">
+          <h2 className="text-2xl font-bold text-center mb-6 text-white">Register</h2>
+          {/* Keep your form fields here as-is */}
+           <form onSubmit={handleSubmit} className="space-y-4">
                <div>
                 <label className="block mb-1 font-medium text-white">Full Name<br />
                    <input name="fullName" value={form.fullName} onChange={handleChange} onBlur={handleBlur} required maxLength="100" className={inputClass('fullName')} />
@@ -456,14 +460,24 @@ export default function Register() {
                  {loading ? 'Registering...' : 'Register'}
                </button>
              </form>
-             {message && <p className={`mt-4 text-center text-sm transition-opacity duration-300 ${message.includes('success') ? 'text-green-600' : 'text-red-500'}`}>{message}</p>}
-             <div className="mt-4 text-center">
-              <span className="text-white">Already have an account? </span>
-               <a href="/" className="text-blue-600 hover:underline">Login</a>
-             </div>
-           </div>
-         </div>
-       </div>
-     </div>
-   );
+          {/* Submit button and error message */}
+          <button type="submit" disabled={loading} className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors shadow-md">
+            {loading ? 'Registering...' : 'Register'}
+          </button>
+          {message && <p className={`mt-4 text-center text-sm transition-opacity duration-300 ${message.includes('success') ? 'text-green-600' : 'text-red-500'}`}>{message}</p>}
+          <div className="mt-4 text-center">
+            <span className="text-white">Already have an account? </span>
+            <a href="/" className="text-blue-600 hover:underline">Login</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
  }
+
+
+
+
+

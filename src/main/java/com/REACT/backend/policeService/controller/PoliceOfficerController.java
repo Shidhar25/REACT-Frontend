@@ -60,7 +60,7 @@ public class PoliceOfficerController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize(("hasAuthority('POLICE_OFFICER')"))
+    @PreAuthorize(("hasAuthority('POLICE_OFFICER') or hasAuthority('POLICE_STATION_ADMIN')"))
     public ResponseEntity<PoliceOfficerResponseDto> getMe(){
         log.info("Getting details of logged user");
         return ResponseEntity.ok(policeOfficerService.getMe());
