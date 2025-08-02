@@ -1,5 +1,8 @@
 package com.REACT.backend.fireService.repository;
 
+import com.REACT.backend.booking.dto.BookingDto;
+import com.REACT.backend.fireService.dto.FireTruckDto;
+import com.REACT.backend.fireService.dto.FireTruckHistoryResponseDto;
 import com.REACT.backend.fireService.model.FireTruckEntity;
 
 import com.REACT.backend.fireService.model.FireTruckStatus;
@@ -38,7 +41,7 @@ public interface FireTruckRepository extends JpaRepository<FireTruckEntity, Long
     @Query("SELECT COUNT(DISTINCT f.fireStationEntity.id) FROM FireTruckEntity f")
     long countDistinctByFireStationId();
 
-
+    public FireTruckEntity findByVehicleRegNumber(String vehicleRegNumber);
     boolean existsByVehicleRegNumber(String numberPlate);
 
     Optional<FireTruckEntity> findByFireTruckId(Long fireTruckId);

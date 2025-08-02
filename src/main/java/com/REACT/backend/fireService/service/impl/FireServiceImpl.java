@@ -1,9 +1,11 @@
 package com.REACT.backend.fireService.service.impl;
 
+import com.REACT.backend.ambulanceService.dto.AmbulanceBookingHistoryResponseDto;
 import com.REACT.backend.ambulanceService.dto.AmbulanceDriverProfileDto;
 import com.REACT.backend.ambulanceService.dto.LocationUpdateByDriver;
 import com.REACT.backend.ambulanceService.model.AmbulanceEntity;
 import com.REACT.backend.ambulanceService.model.AmbulanceStatus;
+import com.REACT.backend.booking.dto.BookingDto;
 import com.REACT.backend.booking.model.EmergencyRequestEntity;
 import com.REACT.backend.booking.model.EmergencyRequestStatus;
 import com.REACT.backend.booking.repository.EmergencyRequestRepository;
@@ -13,6 +15,8 @@ import com.REACT.backend.common.exception.ResourceNotFoundException;
 import com.REACT.backend.common.util.LocationUtils;
 import com.REACT.backend.common.util.LoggedUserUtil;
 import com.REACT.backend.fireService.dto.FireTruckDriverProfileDto;
+import com.REACT.backend.fireService.dto.FireTruckDto;
+import com.REACT.backend.fireService.dto.FireTruckHistoryResponseDto;
 import com.REACT.backend.fireService.model.FireTruckEntity;
 import com.REACT.backend.fireService.model.FireTruckStatus;
 import com.REACT.backend.fireService.repository.FireTruckRepository;
@@ -29,8 +33,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -234,6 +240,25 @@ public class FireServiceImpl  implements FireService {
 
         return "Location Updated successfully";
 
+    }
+
+    public List<FireTruckHistoryResponseDto> fireTruckHistory(String vehicleRegNumber) {
+        FireTruckEntity entity = fireTruckRepository.findByVehicleRegNumber(vehicleRegNumber);
+        List<EmergencyRequestEntity> emergencyRequestEntity = emergencyRequestRepo.findByAssignedFireTruckEntities(entity);
+        List<FireTruckHistoryResponseDto> list = new ArrayList<>();
+
+        for(EmergencyRequestEntity em : emergencyRequestEntity){
+            FireTruckHistoryResponseDto dto = FireTruckHistoryResponseDto.builder()
+                    .id(em.getId())
+                    .emailOfRequester(em.getRequestedBy().getUserEmail())
+                    .requestedAt(em.getCreatedAt())
+                    .latitude(em.getLatitude())
+                    .longitude(em.getLongitude())
+                    .status(em.getFireTruckStatusMap().get(entity))
+                    .build();
+            list.add(dto);
+        }
+        return list;
     }
 
 }

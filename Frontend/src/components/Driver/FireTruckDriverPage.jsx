@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { FaFireExtinguisher, FaPhoneAlt } from 'react-icons/fa';
-import { MdLocationOn } from 'react-icons/md';
+import { FaFireExtinguisher, FaPhoneAlt, FaHome, FaBook, FaUser, FaSignOutAlt } from 'react-icons/fa';
+import { MdLocationOn, MdHistory, MdPerson } from 'react-icons/md';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { UserIcon, HomeIcon, ClockIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
-
+import { UserIcon, HomeIcon, ClockIcon } from '@heroicons/react/24/outline';
+import reactLogo from '../../assets/react-logo.png';
+import fireDriverImg from '../../assets/fireDriver.png';
 // IMPORTANT: Replace with your actual Google Maps API Key and consider environment variables
 const Maps_API_KEY = 'AIzaSyCnwJl8uyVjTS8ql060q5d0az43nvVsyUw'; // <<<--- Replace this
 
@@ -73,6 +74,11 @@ const completionOverlayVariants = {
 export default function FireTruckDriverPage() {
   const [appointment, setAppointment] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
+  const [fireDriverLocation, setFireDriverLocation] = useState(null);
+  const [bookingNotes, setBookingNotes] = useState('');
+  const [bookingIssueType, setBookingIssueType] = useState('');
+  const [fireTruckDistance, setFireTruckDistance] = useState(null);
+  const [fireTruckDuration, setFireTruckDuration] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [completed, setCompleted] = useState(false);
@@ -81,6 +87,7 @@ export default function FireTruckDriverPage() {
   const [completionSlideIn, setCompletionSlideIn] = useState(false);
   const sliderRef = useRef();
   const [activePage, setActivePage] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Profile states
   const [profile, setProfile] = useState(getProfileFromJWT() || mockProfile);
@@ -97,6 +104,8 @@ export default function FireTruckDriverPage() {
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  const [bookingDetailsLoading, setBookingDetailsLoading] = useState(false);
+  const [bookingDetailsError, setBookingDetailsError] = useState('');
 
   // Custom animated cursor
   const cursorX = useMotionValue(-100);
@@ -114,14 +123,17 @@ export default function FireTruckDriverPage() {
   const [currentAddress, setCurrentAddress] = useState('');
   const [appointmentAddress, setAppointmentAddress] = useState('');
 
-  // Fetch profile from API
-  const fetchProfile = async () => {
-    console.log('Fetching profile from API...');
-    console.log('JWT token:', localStorage.getItem('jwt') || localStorage.getItem('token'));
+  // Sidebar menu items
+  const sidebarMenu = [
+    { label: 'Dashboard', icon: <FaHome />, page: 'dashboard' },
+    { label: 'Booking History', icon: <MdHistory />, page: 'history' },
+    { label: 'Profile', icon: <MdPerson />, page: 'profile' },
+  ];
 
+  // Fetch profile from API and then booking history using fireTruckLicence
+  const fetchProfile = async () => {
     setProfileLoading(true);
     setProfileError('');
-
     try {
       const token = localStorage.getItem('jwt') || localStorage.getItem('token');
       if (!token) {
@@ -130,7 +142,6 @@ export default function FireTruckDriverPage() {
         setProfileLoading(false);
         return;
       }
-
       const response = await fetch('http://localhost:8080/fire/truck-driver/v1/me', {
         method: 'GET',
         headers: {
@@ -138,11 +149,8 @@ export default function FireTruckDriverPage() {
           'Content-Type': 'application/json'
         }
       });
-
       if (response.ok) {
         const profileData = await response.json();
-        console.log('Profile data received:', profileData);
-
         setProfile({
           id: profileData.userId || profile.id,
           name: profileData.name || profile.name,
@@ -154,15 +162,17 @@ export default function FireTruckDriverPage() {
           role: profileData.role,
           avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(profileData.name || 'User')}&background=1a202c&color=fff&size=128`
         });
-
         toast.success('Profile updated successfully!');
+        // Fetch booking history using fireTruckRegNumber (fireTruckLicence)
+        if (profileData.fireTruckRegNumber) {
+          fetchBookingHistoryByLicence(profileData.fireTruckRegNumber);
+        }
       } else {
         const errorData = await response.json();
         setProfileError(errorData.message || 'Failed to fetch profile');
         toast.error(errorData.message || 'Failed to fetch profile');
       }
     } catch (err) {
-      console.error('Error fetching profile:', err);
       setProfileError('Network error. Please try again.');
       toast.error('Network error. Please try again.');
     } finally {
@@ -170,8 +180,8 @@ export default function FireTruckDriverPage() {
     }
   };
 
-  // Fetch booking history from API
-  const fetchHistory = async () => {
+  // Fetch booking history by fireTruckLicence and set latest booking location
+  const fetchBookingHistoryByLicence = async (fireTruckLicence) => {
     setHistoryLoading(true);
     setHistoryError('');
     try {
@@ -182,24 +192,27 @@ export default function FireTruckDriverPage() {
         setHistoryLoading(false);
         return;
       }
-
-      const res = await fetch('http://localhost:8080/fire/truck-driver/v1/history', {
+      const res = await fetch(`http://localhost:8080/fire/truck-driver/v1/get-History/${fireTruckLicence}`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-
       if (res.ok) {
         const data = await res.json();
-        // Assuming data is an array of history items
         setHistory(data);
         toast.success('Booking history loaded successfully!');
+        // Set latest booking location as fire truck location
+        if (data && Array.isArray(data) && data.length > 0) {
+          const latestBooking = data[0];
+          if (latestBooking && latestBooking.latitude && latestBooking.longitude) {
+            setFireDriverLocation({ latitude: latestBooking.latitude, longitude: latestBooking.longitude });
+          }
+        }
       } else {
         const errorData = await res.json();
         setHistoryError(errorData.message || 'Failed to fetch booking history.');
         toast.error(errorData.message || 'Failed to fetch booking history.');
       }
     } catch (err) {
-      console.error('Error fetching history:', err);
       setHistoryError('Network error. Please try again.');
       toast.error('Network error. Please try again.');
     } finally {
@@ -207,15 +220,88 @@ export default function FireTruckDriverPage() {
     }
   };
 
-  // Fetch profile when profile page is active
+
+  // Fetch booking details by id and set fire driver location
+  const fetchBookingDetails = async (id) => {
+    setBookingDetailsLoading(true);
+    setBookingDetailsError('');
+    try {
+      const token = localStorage.getItem('jwt') || localStorage.getItem('token');
+      if (!token) {
+        setBookingDetailsError('Authentication token not found. Please login again.');
+        toast.error('Authentication token not found. Please login again.');
+        setBookingDetailsLoading(false);
+        return;
+      }
+      const res = await fetch(`http://localhost:8080/user/booking/${id}`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const booking = await res.json();
+        // Show notes and issue type
+        setBookingNotes(booking.notes || '');
+        setBookingIssueType(booking.issueType || '');
+        // Set fire driver location from booking
+        if (booking && booking.assignedFireTrucks && Array.isArray(booking.assignedFireTrucks)) {
+          const truck = booking.assignedFireTrucks.find(truck => truck.status === 'EN_ROUTE');
+          if (truck) {
+            setFireDriverLocation({ latitude: truck.latitude, longitude: truck.longitude });
+            // Calculate time and distance using Google Maps Distance Matrix API
+            if (booking.latitude && booking.longitude) {
+              getDistanceAndDuration(truck.latitude, truck.longitude, booking.latitude, booking.longitude);
+            }
+          }
+        }
+      } else {
+        const errorData = await res.json();
+        setBookingDetailsError(errorData.message || 'Failed to fetch booking details.');
+        toast.error(errorData.message || 'Failed to fetch booking details.');
+      }
+    } catch (err) {
+      setBookingDetailsError('Network error. Please try again.');
+      toast.error('Network error. Please try again.');
+    } finally {
+      setBookingDetailsLoading(false);
+    }
+  };
+
+  // Get time and distance using Google Maps Distance Matrix API
+  const getDistanceAndDuration = (originLat, originLng, destLat, destLng) => {
+    if (!window.google || !window.google.maps) return;
+    const service = new window.google.maps.DistanceMatrixService();
+    service.getDistanceMatrix({
+      origins: [{ lat: originLat, lng: originLng }],
+      destinations: [{ lat: destLat, lng: destLng }],
+      travelMode: window.google.maps.TravelMode.DRIVING,
+    }, (response, status) => {
+      if (status === 'OK') {
+        const result = response.rows[0].elements[0];
+        setFireTruckDistance(result.distance ? result.distance.text : null);
+        setFireTruckDuration(result.duration ? result.duration.text : null);
+      } else {
+        setFireTruckDistance(null);
+        setFireTruckDuration(null);
+      }
+    });
+  };
+
   useEffect(() => {
-    if (activePage === 'profile') {
-      fetchProfile();
-    }
-    if (activePage === 'history') {
-      fetchHistory();
-    }
-  }, [activePage]);
+    fetchProfile();
+    // fetchHistory(); // Now handled by fetchProfile after profile fetch
+  }, []);
+
+
+
+  // Fetch profile when profile page is active
+  // useEffect(() => {
+  //   if (activePage === 'profile') {
+  //     fetchProfile();
+  //   }
+  //   if (activePage === 'history') {
+  //     fetchHistory();
+  //   }
+  // }, [activePage]);
 
   useEffect(() => {
     const moveCursor = (e) => {
@@ -250,9 +336,9 @@ export default function FireTruckDriverPage() {
           const data = await res.json();
           setAppointment(data);
           if (data) {
-              toast.info('New assignment received!', { autoClose: 5000 });
+            toast.info('New assignment received!', { autoClose: 5000 });
           } else {
-              toast.info('No active assignments.');
+            toast.info('No active assignments.');
           }
         } else {
           const data = await res.json();
@@ -269,29 +355,34 @@ export default function FireTruckDriverPage() {
     fetchAppointment();
   }, []);
 
+  // Use fireDriverLocation as current location if available
   useEffect(() => {
-    if (!navigator.geolocation) {
+    if (fireDriverLocation) {
+      setUserLocation(fireDriverLocation);
+    } else {
+      if (!navigator.geolocation) {
         setError('Geolocation is not supported by your browser.');
         toast.error('Geolocation is not supported by your browser.');
         return;
-    }
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        setUserLocation({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude
-        });
-      },
-      (err) => {
+      }
+      const watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          setUserLocation({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude
+          });
+        },
+        (err) => {
           console.error('Geolocation error:', err);
           setError(`Geolocation error: ${err.message}. Please enable location services.`);
           toast.error(`Geolocation error: ${err.message}`);
-      },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-    );
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
 
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, []);
+      return () => navigator.geolocation.clearWatch(watchId);
+    }
+  }, [fireDriverLocation]);
 
   // Update location with live coordinates
   const handleLocationUpdate = async (latitude, longitude) => {
@@ -568,245 +659,224 @@ export default function FireTruckDriverPage() {
 
   return (
     <div className="min-h-screen flex flex-col font-inter text-black relative overflow-hidden" style={{ backgroundColor: 'var(--neutral-bg-main)' }}>
-      {/* Inject custom color variables */}
-      <style>
-        {`
-          :root {
-            /* Primary Green Tones */
-            --green-sidebar-accent: #2D4739;
-            --green-header-btn: #3A5543;
-            --green-bg-tint: #E6ECE8;
-            --green-progress: #88A596;
-
-            /* Neutral Tones */
-            --neutral-bg-main: #E8E6E0;
-            --neutral-bg-card: #F7F6F2;
-            --neutral-text-placeholder: #B0B0AC;
-            --neutral-text-header: #333333;
-
-            /* Accent and Alert Colors */
-            --accent-success: #2DA66D;
-            --accent-danger: #D95C5C;
-            --accent-btn-dark: #3A5C47;
-            --accent-avatar-bg: #F3F2EF;
-          }
-        `}
-      </style>
-      {/* Custom Animated Cursor */}
-      <motion.div
-        className="fixed z-[9999] pointer-events-none"
-        style={{
-          left: 0,
-          top: 0,
-          x: cursorXSpring,
-          y: cursorYSpring,
-          translateX: '-50%',
-          translateY: '-50%',
-        }}
-        animate={{
-          scale: cursorVariant === 'hover' ? 1.5 : 1,
-          opacity: cursorVariant === 'hover' ? 0.8 : 0.6,
-        }}
-        transition={{ duration: 0.2 }}
-      >
-        <div className="w-4 h-4 bg-white rounded-full shadow-lg border border-white/30"></div>
-      </motion.div>
-
-      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop={true} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
+      {/* Mobile Sidebar Overlay */}
+      <div className={`fixed inset-0 z-50 bg-black/40 transition-opacity duration-300 ${sidebarOpen ? 'block' : 'hidden'} md:hidden`} onClick={() => setSidebarOpen(false)} />
+      <aside className={`fixed top-0 left-0 z-50 h-full w-72 bg-white shadow-lg transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:hidden rounded-r-3xl`}>
+        <div className="flex flex-col h-full">
+          {/* Profile Section */}
+          <div className="flex flex-col items-center py-8 border-b">
+            <img src={profile.avatar || fireDriverImg} alt="avatar" className="w-20 h-20 rounded-full object-cover border-2 border-blue-400 shadow-md mb-2" />
+            <div className="font-bold text-lg text-black">{profile.name || 'Fire Driver'}</div>
+            <div className="text-xs text-gray-500">{profile.role || 'Fire Truck Driver'}</div>
+          </div>
+          {/* Menu */}
+          <nav className="flex flex-col gap-1 px-4 py-6 flex-1">
+            {sidebarMenu.map((item) => (
+              <button
+                key={item.page}
+                onClick={() => { setActivePage(item.page); setSidebarOpen(false); }}
+                className={`flex items-center gap-3 px-4 py-3 rounded-full text-base font-medium transition-all
+                  ${activePage === item.page ? 'bg-gray-100 text-black font-semibold' : 'hover:bg-gray-50 text-gray-700'}`}
+              >
+                <span className="text-xl">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-4 py-3 rounded-full text-base font-medium text-red-600 hover:bg-red-50 mt-8"
+            >
+              <FaSignOutAlt className="text-xl" />
+              Logout
+            </button>
+          </nav>
+        </div>
+      </aside>
 
       {/* Top Bar */}
-      <header
-        className="flex items-center justify-between text-white px-6 py-3 shadow-lg border-b border-white/20"
-        style={{
-          backgroundColor: 'var(--neutral-bg-main)', // Use main background from palette
-          color: 'var(--neutral-text-header)',
-          backdropFilter: 'blur(12px)',
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <img src={profile.avatar} alt="avatar" className="w-12 h-12 rounded-full border-2 border-blue-400 shadow-lg" />
-          <div>
-            <div className="font-bold text-lg" style={{ color: 'var(--neutral-text-header)' }}>{profile.name}</div>
-            <div className="text-sm flex items-center gap-1" style={{ color: 'var(--neutral-text-placeholder)' }}>
-              <FaPhoneAlt className="inline mr-1 text-blue-400" />
-              {profile.phone}
+      <div className="border-b border-gray-200 bg-[#E8E6E0]" >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+          {/* Hamburger for mobile */}
+          <button className="md:hidden text-2xl" onClick={() => setSidebarOpen(true)}>
+            &#9776;
+          </button>
+          {/* Logo and Title */}
+          <div className="flex items-center gap-4">
+            <img src={reactLogo} alt="Logo" className="h-10 w-10 object-contain rounded-xl bg-white p-2 shadow-sm" />
+            <h1 className="text-lg font-semibold text-gray-800">Fire Driver</h1>
+          </div>
+          {/* Right - User Info & Actions */}
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden sm:block">
+              <p className="text-sm text-gray-600">Welcome {profile.name}</p>
+              <p className="text-xs text-gray-400">Updated: {new Date().toLocaleTimeString()}</p>
             </div>
+            <img src={fireDriverImg} alt="Admin" className="h-8 w-8 rounded-full object-cover border-2 border-white shadow" onClick={() => setActivePage('profile')} />
+            <button onClick={handleLogout} title="Logout" className="text-red-600 hover:text-red-800 transition hidden sm:block">
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" /></svg>
+            </button>
           </div>
         </div>
-        <button
-          onClick={handleLogout}
-          className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-white font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
-          onMouseEnter={handleCursorEnter}
-          onMouseLeave={handleCursorLeave}
-        >
-          Logout
-        </button>
-      </header>
+      </div>
 
-
-      <div className="w-full max-w-7xl mx-auto">
-        {/* Horizontal Navbar - Enhanced Styling */}
-        <nav
-          className="flex flex-row items-center justify-center gap-4 py-4 px-4 border-b border-white/20 shadow-lg"
-          style={{ backgroundColor: 'var(--green-sidebar-accent)' }}
-        >
-          <motion.button
-            onClick={() => setActivePage('dashboard')}
-            className={`flex items-center gap-2 px-5 py-2 rounded-lg font-semibold transition-all duration-200 text-base ${activePage === 'dashboard' ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-white/20 text-white'}`}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.97 }}
-            onMouseEnter={handleCursorEnter}
-            onMouseLeave={handleCursorLeave}
-          >
-            <HomeIcon className="h-5 w-5" /> Dashboard
-          </motion.button>
-          <motion.button
-            onClick={() => setActivePage('history')}
-            className={`flex items-center gap-2 px-5 py-2 rounded-lg font-semibold transition-all duration-200 text-base ${activePage === 'history' ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-white/20 text-white'}`}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.97 }}
-            onMouseEnter={handleCursorEnter}
-            onMouseLeave={handleCursorLeave}
-          >
-            <ClockIcon className="h-5 w-5" /> Booking History
-          </motion.button>
-          <motion.button
-            onClick={() => setActivePage('profile')}
-            className={`flex items-center gap-2 px-5 py-2 rounded-lg font-semibold transition-all duration-200 text-base ${activePage === 'profile' ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-white/20 text-white'}`}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.97 }}
-            onMouseEnter={handleCursorEnter}
-            onMouseLeave={handleCursorLeave}
-          >
-            <UserIcon className="h-5 w-5" /> Profile
-          </motion.button>
+      {/* Desktop Navbar (hidden on mobile) */}
+      {/* <div className="w-full max-w-7xl mx-auto hidden md:flex justify-center bg-[#E8E6E0] py-4">
+        <nav className="bg-[#fef4f4] border border-red-200 rounded-full shadow-lg px-4 py-2 flex space-x-4 max-w-3xl">
+          <button onClick={() => setActivePage('dashboard')} className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${activePage === 'dashboard' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}`}>Dashboard</button>
+          <button onClick={() => setActivePage('history')} className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${activePage === 'history' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}`}>Booking History</button>
+          <button onClick={() => setActivePage('profile')} className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${activePage === 'profile' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}`}>Profile</button>
         </nav>
+      </div> */}
+
+<div className="w-full max-w-7xl mx-auto">
+  {/* Horizontal Navbar - Enhanced Styling */}
+  <div className="w-full flex justify-center bg-[#E8E6E0] py-4 sm:py-6">
+    <nav
+      className="bg-[#fef4f4] border border-red-200 rounded-full shadow-lg px-2 sm:px-4 py-2 flex space-x-2 sm:space-x-4 overflow-x-auto max-w-full sm:max-w-3xl"
+      style={{ backgroundColor: '#fff4f4' }}
+    >
+      {/* Mobile: icons only, Desktop: icons + text */}
+      <motion.button
+        onClick={() => setActivePage('dashboard')}
+        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
+          ${activePage === 'dashboard' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}
+          sm:justify-start`}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.97 }}
+        onMouseEnter={handleCursorEnter}
+        onMouseLeave={handleCursorLeave}
+      >
+        <HomeIcon className="h-5 w-5" />
+        <span className="hidden sm:inline">Dashboard</span>
+      </motion.button>
+
+      <motion.button
+        onClick={() => setActivePage('history')}
+        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
+          ${activePage === 'history' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}
+          sm:justify-start`}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.97 }}
+        onMouseEnter={handleCursorEnter}
+        onMouseLeave={handleCursorLeave}
+      >
+        <ClockIcon className="h-5 w-5" />
+        <span className="hidden sm:inline">Booking History</span>
+      </motion.button>
+
+      <motion.button
+        onClick={() => setActivePage('profile')}
+        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
+          ${activePage === 'profile' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}
+          sm:justify-start`}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.97 }}
+        onMouseEnter={handleCursorEnter}
+        onMouseLeave={handleCursorLeave}
+      >
+        <UserIcon className="h-5 w-5" />
+        <span className="hidden sm:inline">Profile</span>
+      </motion.button>
+    </nav>
+  </div>
 
         {/* Main Content */}
         <main
-          className="flex-1 p-6"
-          style={{ backgroundColor: 'var(--neutral-bg-card)' }} // Use card/section background from palette
+          className="flex-1 p-2 sm:p-6"
+          style={{ backgroundColor: 'var(--neutral-bg-card)' }}
         >
           {activePage === 'dashboard' && (
             <motion.div variants={containerVariants} initial="hidden" animate="visible">
-
-              {/* Location Update Controls */}
-              <motion.div
-                className="bg-white/10 backdrop-blur-md rounded-xl shadow-lg border border-white/20 p-6 mb-6"
-                variants={itemVariants}
-                onMouseEnter={handleCursorEnter}
-                onMouseLeave={handleCursorLeave}
-              >
-                <h3 className="text-lg font-semibold text-black mb-4 flex items-center gap-2">
-                  <MdLocationOn className="text-xl text-red-400" />
-                  Location Management
+              {/* Dashboard Layout: Map (left), Location (right), Recent EN_ROUTE booking */}
+              <motion.div className="w-full mb-6 rounded-xl shadow-sm border border-gray-200 p-2 sm:p-6" variants={itemVariants} style={{ backgroundColor: 'var(--neutral-bg-card)' }}>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <MdLocationOn className="text-xl text-blue-600" />
+                  Dashboard Overview
                 </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                    <h4 className="text-black font-semibold mb-2">Current Location</h4>
-                    {userLocation ? (
-                      <div className="text-sm text-black/80">
-                        <p>Latitude: {userLocation.latitude.toFixed(6)}</p>
-                        <p>Longitude: {userLocation.longitude.toFixed(6)}</p>
-                        <p className="mt-1 text-xs text-black/60">Address: {currentAddress || "Loading address..."}</p>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-red-400">Location not available</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                  {/* Left: Google Map */}
+                  <div className="bg-gray-50 rounded-lg shadow p-2 sm:p-4 flex flex-col items-center justify-center">
+                    <div className="font-semibold text-gray-800 mb-2">Map View</div>
+                    <div
+                      ref={googleMapRef}
+                      className="w-full h-60 sm:h-80 rounded-lg shadow border relative"
+                      style={{ background: "#E6ECE8" }}
+                    />
+                    {userLocation && appointment && (
+                      <a
+                        href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${appointment.latitude},${appointment.longitude}&travelmode=driving`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-4 inline-block bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200 shadow"
+                      >
+                        Navigate in Google Maps
+                      </a>
                     )}
                   </div>
-
-                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                    <h4 className="text-black font-semibold mb-2">Location Updates</h4>
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => userLocation && handleLocationUpdate(userLocation.latitude, userLocation.longitude)}
-                        disabled={locationUpdateLoading || !userLocation}
-                        className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
-                      >
-                        {locationUpdateLoading ? 'Updating...' : 'Update Location Now'}
-                      </button>
-
-                      <button
-                        onClick={toggleAutoLocationUpdate}
-                        disabled={!userLocation}
-                        className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${autoLocationUpdate
-                          ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                          : 'bg-green-600 hover:bg-green-700 text-white'
-                        }`}
-                      >
-                        {autoLocationUpdate ? 'Stop Auto Updates' : 'Start Auto Updates'}
-                      </button>
+                  {/* Right: Current Location & Recent Booking */}
+                  <div className="flex flex-col gap-4 sm:gap-6">
+                    <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                      <h4 className="text-black font-semibold mb-2">Current Location (Fire Truck)</h4>
+                      {fireDriverLocation ? (
+                        <div className="text-sm text-black/80">
+                          <p>Latitude: {fireDriverLocation.latitude?.toFixed(6)}</p>
+                          <p>Longitude: {fireDriverLocation.longitude?.toFixed(6)}</p>
+                          <p className="mt-1 text-xs text-black/60">Address: {currentAddress || "Loading address..."}</p>
+                          {fireTruckDistance && fireTruckDuration && (
+                            <div className="mt-2 text-xs text-black/80">
+                              <span className="font-semibold">Distance:</span> {fireTruckDistance}<br />
+                              <span className="font-semibold">Estimated Time:</span> {fireTruckDuration}
+                            </div>
+                          )}
+                          {bookingNotes && (
+                            <div className="mt-2 text-xs text-black/80">
+                              <span className="font-semibold">Notes:</span> {bookingNotes}
+                            </div>
+                          )}
+                          {bookingIssueType && (
+                            <div className="mt-2 text-xs text-black/80">
+                              <span className="font-semibold">Issue Type:</span> {bookingIssueType}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-red-400">Location not available</p>
+                      )}
                     </div>
-                    {appointment && (
-                      <div className="mt-3 text-xs text-black/80">
-                        <div className="font-semibold">Appointment Address:</div>
-                        <div>{appointmentAddress || "Loading address..."}</div>
-                      </div>
-                    )}
+
+                    {/* Recent EN_ROUTE Booking from History */}
+                    <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                      <h4 className="text-black font-semibold mb-2">Recent Booking (EN_ROUTE)</h4>
+                      {history && history.length > 0 ? (
+                        (() => {
+                          const recentEnRoute = history.find(h => h.status === 'EN_ROUTE');
+                          if (recentEnRoute) {
+                            return (
+                              <div className="text-sm text-black/80">
+                                <p><span className="font-semibold">ID:</span> {recentEnRoute.id}</p>
+                                <p><span className="font-semibold">User ID:</span> {recentEnRoute.userId}</p>
+                                <p><span className="font-semibold">Email:</span> {recentEnRoute.emailOfRequester}</p>
+                                <p><span className="font-semibold">Requested At:</span> {new Date(recentEnRoute.requestedAt).toLocaleString('en-US', {
+                                  year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                })}</p>
+                                <p><span className="font-semibold">Location:</span> {recentEnRoute.latitude?.toFixed(4)}, {recentEnRoute.longitude?.toFixed(4)}</p>
+                                <p><span className="font-semibold">Status:</span> <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">{recentEnRoute.status}</span></p>
+                                {profile.fireTruckRegNumber && (
+                                  <p><span className="font-semibold">Fire Truck:</span> {profile.fireTruckRegNumber}</p>
+                                )}
+                              </div>
+                            );
+                          } else {
+                            return <p className="text-sm text-gray-500">No EN_ROUTE bookings found.</p>;
+                          }
+                        })()
+                      ) : (
+                        <p className="text-sm text-gray-500">No booking history found.</p>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                {locationUpdateMessage && (
-                  <motion.div
-                    className={`mt-4 p-3 rounded-lg text-sm border ${locationUpdateMessage.includes('success')
-                        ? 'bg-green-500/20 text-green-700 border-green-500/30'
-                        : 'bg-red-500/20 text-red-700 border-red-500/30'
-                      }`}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                  >
-                    {locationUpdateMessage}
-                  </motion.div>
-                )}
               </motion.div>
-
-
-
-              {error && <div className="mb-4 p-3 rounded-md bg-red-100 text-red-700 border border-red-200 w-full text-center">{error}</div>}
-              {loading && <div className="mb-4 text-blue-600 text-center">Loading...</div>}
-
-              {appointment && userLocation ? (
-                <motion.div className="w-full mb-6 rounded-xl shadow-sm border border-gray-200 p-6" variants={itemVariants} style={{ backgroundColor: 'var(--neutral-bg-card)' }}>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                    <MdLocationOn className="text-xl text-red-600" />
-                    Current Assignment
-                  </h3>
-                  {/* Google Map container */}
-                  <div
-                    ref={googleMapRef}
-                    className="w-full h-80 rounded-lg shadow border mb-4 relative"
-                    style={{ background: "#E6ECE8" }}
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-gray-50 border-l-4 border-gray-300 p-4 rounded-lg">
-                      <div className="font-semibold text-gray-800 mb-1">Appointment Location:</div>
-                      <div className="font-mono text-base text-gray-700">{appointment.latitude}, {appointment.longitude}</div>
-                    </div>
-                    <div className="bg-gray-50 border-l-4 border-gray-300 p-4 rounded-lg">
-                      <div className="font-semibold text-gray-800 mb-1">Your Location:</div>
-                      <div className="font-mono text-base text-gray-700">{userLocation.latitude.toFixed(4)}, {userLocation.longitude.toFixed(4)}</div>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex flex-col items-center gap-2">
-                    <a
-                      href={`https://www.google.com/maps/dir/${userLocation.latitude},${userLocation.longitude}/${appointment.latitude},${appointment.longitude}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block bg-red-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-red-700 transition-colors duration-200 shadow"
-                    >
-                      Navigate in Google Maps
-                    </a>
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  className="w-full mb-6 bg-gray-100 p-6 rounded-xl shadow border border-gray-200 text-gray-700 text-center"
-                  variants={itemVariants}
-                >
-                  No active assignment at the moment. Please wait for new requests.
-                </motion.div>
-              )}
 
               {appointment && !completed ? (
                 <div className="flex flex-col items-center w-full relative h-32">
@@ -845,58 +915,58 @@ export default function FireTruckDriverPage() {
                         style={{ accentColor: '#2563eb' }}
                       />
                       {/* Custom thumb with arrow */}
-  <style>{`
-    input[type='range']::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: #2563eb;
-      box-shadow: 0 2px 8px rgba(37,99,235,0.15);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s;
-      position: relative;
-    }
-    input[type='range']:focus::-webkit-slider-thumb {
-      outline: 2px solid #2563eb;
-    }
-    input[type='range']::-webkit-slider-thumb::before {
-      content: '';
-      display: block;
-      position: absolute;
-      left: 8px;
-      top: 7px;
-      width: 0;
-      height: 0;
-      border-top: 7px solid transparent;
-      border-bottom: 7px solid transparent;
-      border-left: 12px solid #fff;
-    }
-    input[type='range']::-webkit-slider-thumb::after {
-      display: none;
-    }
-    input[type='range']::-moz-range-thumb {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: #2563eb;
-      box-shadow: 0 2px 8px rgba(37,99,235,0.15);
-      border: none;
-      position: relative;
-    }
-    input[type='range']:focus::-moz-range-thumb {
-      outline: 2px solid #2563eb;
-    }
-    input[type='range']::-moz-range-thumb {
-      background: #2563eb url('data:image/svg+xml;utf8,<svg width="18" height="18" xmlns="http://www.w3.org/2000/svg"><polygon points="6,3 16,9 6,15" fill="white"/></svg>') no-repeat center center;
-      background-size: 18px 18px;
-    }
-    /* Hide the default arrow for Firefox */
-    input[type='range']::-moz-focus-outer { border: 0; }
-  `}</style>
+                      <style>{`
+  input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #2563eb;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    position: relative;
+  }
+  input[type='range']:focus::-webkit-slider-thumb {
+    outline: 2px solid #2563eb;
+  }
+  input[type='range']::-webkit-slider-thumb::before {
+    content: '';
+    display: block;
+    position: absolute;
+    left: 8px;
+    top: 7px;
+    width: 0;
+    height: 0;
+    border-top: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+    border-left: 12px solid #fff;
+  }
+  input[type='range']::-webkit-slider-thumb::after {
+    display: none;
+  }
+  input[type='range']::-moz-range-thumb {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #2563eb;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.15);
+    border: none;
+    position: relative;
+  }
+  input[type='range']:focus::-moz-range-thumb {
+    outline: 2px solid #2563eb;
+  }
+  input[type='range']::-moz-range-thumb {
+    background: #2563eb url('data:image/svg+xml;utf8,<svg width="18" height="18" xmlns="http://www.w3.org/2000/svg"><polygon points="6,3 16,9 6,15" fill="white"/></svg>') no-repeat center center;
+    background-size: 18px 18px;
+  }
+  /* Hide the default arrow for Firefox */
+  input[type='range']::-moz-focus-outer { border: 0; }
+`}</style>
                       <div className="flex justify-between w-full text-xs mt-2">
                         <span>Start</span>
                         <span>End</span>
@@ -933,21 +1003,85 @@ export default function FireTruckDriverPage() {
                   Booking marked as completed! Ready for next assignment.
                 </motion.div>
               )}
+
+              <motion.div
+                className="w-full mb-6 rounded-xl shadow-sm border border-gray-200 p-2 sm:p-6"
+                variants={itemVariants}
+                onMouseEnter={handleCursorEnter}
+                onMouseLeave={handleCursorLeave}
+              >
+                <h3 className="text-lg font-semibold text-black mb-4 flex items-center gap-2">
+                  <MdLocationOn className="text-xl text-blue-400" />
+                  Location Management
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                    <h4 className="text-black font-semibold mb-2">Current Location</h4>
+                    {userLocation ? (
+                      <div className="text-sm text-black/80">
+                        <p>Latitude: {userLocation.latitude.toFixed(6)}</p>
+                        <p>Longitude: {userLocation.longitude.toFixed(6)}</p>
+                        <p className="mt-1 text-xs text-black/60">Address: {currentAddress || "Loading address..."}</p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-red-400">Location not available</p>
+                    )}
+                  </div>
+
+                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                    <h4 className="text-black font-semibold mb-2">Location Updates</h4>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => userLocation && handleLocationUpdate(userLocation.latitude, userLocation.longitude)}
+                        disabled={locationUpdateLoading || !userLocation}
+                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                      >
+                        {locationUpdateLoading ? 'Updating...' : 'Update Location Now'}
+                      </button>
+
+                      <button
+                        onClick={toggleAutoLocationUpdate}
+                        disabled={!userLocation}
+                        className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${autoLocationUpdate
+                          ? 'bg-red-600 hover:bg-red-700 text-white'
+                          : 'bg-green-600 hover:bg-green-700 text-white'
+                          }`}
+                      >
+                        {autoLocationUpdate ? 'Stop Auto Updates' : 'Start Auto Updates'}
+                      </button>
+                    </div>
+                    {appointment && (
+                      <div className="mt-3 text-xs text-black/80">
+                        <div className="font-semibold">Appointment Address:</div>
+                        <div>{appointmentAddress || "Loading address..."}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {locationUpdateMessage && (
+                  <motion.div
+                    className={`mt-4 p-3 rounded-lg text-sm border ${locationUpdateMessage.includes('success')
+                      ? 'bg-green-500/20 text-green-300 border-green-500/30'
+                      : 'bg-red-500/20 text-red-300 border-red-500/30'
+                      }`}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    {locationUpdateMessage}
+                  </motion.div>
+                )}
+              </motion.div>
             </motion.div>
+
+
+
           )}
           {activePage === 'history' && (
-            <motion.div className="bg-white rounded-xl shadow p-6" variants={containerVariants} initial="hidden" animate="visible">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-800">Booking History</h2>
-                <button
-                  onClick={fetchHistory}
-                  disabled={historyLoading}
-                  className="bg-blue-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-600 disabled:opacity-50 transition-colors duration-200 shadow-md"
-                  onMouseEnter={handleCursorEnter}
-                  onMouseLeave={handleCursorLeave}
-                >
-                  {historyLoading ? 'Refreshing...' : 'Refresh History'}
-                </button>
+            <motion.div className="bg-white rounded-xl shadow p-2 sm:p-6 overflow-x-auto" variants={containerVariants} initial="hidden" animate="visible">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-2">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-800">Booking History</h2>
               </div>
 
               {historyError && (
@@ -973,7 +1107,7 @@ export default function FireTruckDriverPage() {
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm">
+                      <table className="min-w-full text-xs sm:text-sm">
                         <thead>
                           <motion.tr className="bg-gray-100" variants={itemVariants}>
                             <th className="px-4 py-3 text-left text-gray-700 font-semibold">ID</th>
@@ -1011,12 +1145,12 @@ export default function FireTruckDriverPage() {
                               </td>
                               <td className="px-4 py-3">
                                 <span className={`px-2 py-1 rounded-full text-xs font-semibold ${h.status === 'COMPLETED'
-                                    ? 'bg-green-100 text-green-800'
-                                    : h.status === 'EN_ROUTE'
-                                      ? 'bg-blue-100 text-blue-800'
-                                      : h.status === 'CANCELLED'
-                                        ? 'bg-red-100 text-red-800'
-                                        : 'bg-gray-100 text-gray-800'
+                                  ? 'bg-green-100 text-green-800'
+                                  : h.status === 'EN_ROUTE'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : h.status === 'CANCELLED'
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-gray-100 text-gray-800'
                                   }`}>
                                   {h.status}
                                 </span>
@@ -1050,7 +1184,7 @@ export default function FireTruckDriverPage() {
 
               {!profileLoading && !profileError && (
                 <div className="flex flex-col items-center gap-4">
-                  <img src={profile.avatar} alt="avatar" className="w-24 h-24 rounded-full border-2 border-blue-400 shadow-md" />
+                  <img src={fireDriverImg} alt="avatar" className="w-24 h-24 rounded-full border-2 border-blue-400 shadow-md" />
                   <div className="font-bold text-lg text-black">{profile.name}</div>
 
                   <div className="w-full space-y-3">
@@ -1071,7 +1205,7 @@ export default function FireTruckDriverPage() {
                     {profile.email && (
                       <div className="flex items-center gap-2 text-black/80">
                         <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 012 2h4a2 2 0 012 2v1" />
                         </svg>
                         <span>{profile.email}</span>
                       </div>

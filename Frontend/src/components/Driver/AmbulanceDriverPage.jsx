@@ -1,10 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { FaAmbulance, FaPhoneAlt, FaStar, FaCheckCircle } from 'react-icons/fa';
+import { FaAmbulance, FaPhoneAlt, FaStar, FaCheckCircle, FaSignOutAlt } from 'react-icons/fa';
 import { MdAccessTime, MdCloud, MdAssignment, MdLocalHospital, MdLocationOn } from 'react-icons/md';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import AmbulanceDriverImg from '../../assets/ambulanceDriver.png';
 import { UserIcon, HomeIcon, ClockIcon, MapIcon as MapOutlineIcon } from '@heroicons/react/24/outline';
+
+import reactLogo from '../../assets/react-logo.png';
 
 function decodeJWT(token) {
   if (!token) return {};
@@ -178,7 +181,7 @@ export default function AmbulanceDriverPage() {
     }
   };
 
-  // Fetch history from API
+  // Fetch history from API and then fetch booking details for EN_ROUTE
   const fetchHistory = async () => {
     console.log('Fetching history from API...');
     console.log('JWT token:', localStorage.getItem('jwt') || localStorage.getItem('token'));
@@ -206,9 +209,37 @@ export default function AmbulanceDriverPage() {
       if (response.ok) {
         const historyData = await response.json();
         console.log('History data received:', historyData);
-
         setHistory(historyData);
         toast.success('History updated successfully!');
+
+        // Find the most recent EN_ROUTE booking
+        const recentEnRoute = historyData.find(h => h.status === 'EN_ROUTE');
+        if (recentEnRoute && recentEnRoute.id) {
+          // Fetch booking details using the id
+          try {
+            const bookingRes = await fetch(`http://localhost:8080/user/booking/${recentEnRoute.id}`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            if (bookingRes.ok) {
+              const bookingData = await bookingRes.json();
+              // If bookingData.assignedAmbulances exists, set userLocation to the first ambulance's location
+              if (bookingData.assignedAmbulances && bookingData.assignedAmbulances.length > 0) {
+                const ambulance = bookingData.assignedAmbulances[0];
+                setUserLocation({ latitude: ambulance.latitude, longitude: ambulance.longitude });
+                toast.info('Ambulance driver location updated from booking data.');
+              }
+            } else {
+              const bookingError = await bookingRes.json();
+              toast.error(bookingError.message || 'Failed to fetch booking details');
+            }
+          } catch (err) {
+            toast.error('Network error while fetching booking details.');
+          }
+        }
       } else {
         const errorData = await response.json();
         setHistoryError(errorData.message || 'Failed to fetch history');
@@ -244,19 +275,14 @@ export default function AmbulanceDriverPage() {
     }
   }, [userLocation, appointment]);
 
-  useEffect(() => {
-    // Fetch profile when profile page is accessed
-    if (activePage === 'profile') {
+    useEffect(() => {
+    
       fetchProfile();
-    }
-  }, [activePage]);
-
-  useEffect(() => {
-    // Fetch history when history page is accessed
-    if (activePage === 'history') {
+    
+    
       fetchHistory();
-    }
-  }, [activePage]);
+    }, []);
+
 
   useEffect(() => {
     const fetchAppointment = async () => {
@@ -297,24 +323,22 @@ export default function AmbulanceDriverPage() {
     fetchAppointment();
   }, []);
 
-  useEffect(() => {
+  // Only get location when Update Location button is clicked
+  const getCurrentLocation = () => {
     if (!navigator.geolocation) {
       setError('Geolocation is not supported by your browser.');
       toast.error('Geolocation is not supported by your browser.');
       return;
     }
-    const watchId = navigator.geolocation.watchPosition(
+    navigator.geolocation.getCurrentPosition(
       (pos) => {
         const newLocation = {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude
         };
         setUserLocation(newLocation);
-
-        // Auto-update location if enabled
-        if (autoLocationUpdate) {
-          handleLocationUpdate(newLocation.latitude, newLocation.longitude);
-        }
+        // Optionally, update location on server immediately
+        handleLocationUpdate(newLocation.latitude, newLocation.longitude);
       },
       (err) => {
         console.error('Geolocation error:', err);
@@ -323,9 +347,7 @@ export default function AmbulanceDriverPage() {
       },
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
-
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [autoLocationUpdate]);
+  };
 
   const handleComplete = async () => {
     setSliderAnimating(false);
@@ -463,7 +485,7 @@ export default function AmbulanceDriverPage() {
 
   // Google Maps loader
   useEffect(() => {
-    if (!window.google && appointment && userLocation) {
+    if (!window.google) {
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyCnwJl8uyVjTS8ql060q5d0az43nvVsyUw`;
       script.async = true;
@@ -480,7 +502,7 @@ export default function AmbulanceDriverPage() {
     // eslint-disable-next-line
   }, [appointment, userLocation]);
 
-  // Render Google Map
+  // Render Google Map and show distance/time
   function renderGoogleMap() {
     if (!googleMapRef.current || !window.google) return;
 
@@ -528,7 +550,7 @@ export default function AmbulanceDriverPage() {
     bounds.extend({ lat: userLocation.latitude, lng: userLocation.longitude });
     mapInstance.current.fitBounds(bounds);
 
-    // Draw directions (route)
+    // Draw directions (route) and get distance/time
     const directionsService = new window.google.maps.DirectionsService();
     const directionsRenderer = new window.google.maps.DirectionsRenderer({
       map: mapInstance.current,
@@ -549,6 +571,14 @@ export default function AmbulanceDriverPage() {
       (result, status) => {
         if (status === window.google.maps.DirectionsStatus.OK) {
           directionsRenderer.setDirections(result);
+          // Get distance and duration from result
+          if (result.routes && result.routes[0] && result.routes[0].legs && result.routes[0].legs[0]) {
+            const leg = result.routes[0].legs[0];
+            setRouteInfo({
+              distance: leg.distance.text,
+              duration: leg.duration.text
+            });
+          }
         }
       }
     );
@@ -578,247 +608,240 @@ export default function AmbulanceDriverPage() {
     </motion.div>
   );
 
+  // Add sidebar state for mobile
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Sidebar menu config
+  const sidebarMenu = [
+    { page: 'dashboard', label: 'Dashboard', icon: <HomeIcon /> },
+    { page: 'history', label: 'Booking History', icon: <ClockIcon /> },
+    { page: 'profile', label: 'Profile', icon: <UserIcon /> },
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col font-inter text-white relative overflow-hidden" style={{ backgroundColor: 'var(--neutral-bg-main)' }}>
-      {/* Inject custom color variables */}
-      <style>
-        {`
-          :root {
-            /* Primary Green Tones */
-            --green-sidebar-accent: #2D4739;
-            --green-header-btn: #3A5543;
-            --green-bg-tint: #E6ECE8;
-            --green-progress: #88A596;
-
-            /* Neutral Tones */
-            --neutral-bg-main: #E8E6E0;
-            --neutral-bg-card: #F7F6F2;
-            --neutral-text-placeholder: #B0B0AC;
-            --neutral-text-header: #333333;
-
-            /* Accent and Alert Colors */
-            --accent-success: #2DA66D;
-            --accent-danger: #D95C5C;
-            --accent-btn-dark: #3A5C47;
-            --accent-avatar-bg: #F3F2EF;
-          }
-        `}
-      </style>
-      {/* Custom Animated Cursor */}
-      <motion.div
-        className="fixed z-[9999] pointer-events-none"
-        style={{
-          left: 0,
-          top: 0,
-          x: cursorXSpring,
-          y: cursorYSpring,
-          translateX: '-50%',
-          translateY: '-50%',
-        }}
-        animate={{
-          scale: cursorVariant === 'hover' ? 1.5 : 1,
-          opacity: cursorVariant === 'hover' ? 0.8 : 0.6,
-        }}
-        transition={{ duration: 0.2 }}
-      >
-        <div className="w-4 h-4 bg-white rounded-full shadow-lg border border-white/30"></div>
-      </motion.div>
-
-      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop={true} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
+    <div className="min-h-screen flex flex-col font-inter text-black relative overflow-hidden" style={{ backgroundColor: 'var(--neutral-bg-main)' }}>
+      {/* Mobile Sidebar Overlay */}
+      <div className={`fixed inset-0 z-50 bg-black/40 transition-opacity duration-300 ${sidebarOpen ? 'block' : 'hidden'} md:hidden`} onClick={() => setSidebarOpen(false)} />
+      <aside className={`fixed top-0 left-0 z-50 h-full w-72 bg-white shadow-lg transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:hidden rounded-r-3xl`}>
+        <div className="flex flex-col h-full">
+          {/* Profile Section */}
+          <div className="flex flex-col items-center py-8 border-b">
+            <img src={profile.avatar || AmbulanceDriverImg} alt="avatar" className="w-20 h-20 rounded-full object-cover border-2 border-blue-400 shadow-md mb-2" />
+            <div className="font-bold text-lg text-black">{profile.name || 'Ambulance Driver'}</div>
+            <div className="text-xs text-gray-500">{profile.role || 'Ambulance Driver'}</div>
+          </div>
+          {/* Menu */}
+          <nav className="flex flex-col gap-1 px-4 py-6 flex-1">
+            {sidebarMenu.map((item) => (
+              <button
+                key={item.page}
+                onClick={() => { setActivePage(item.page); setSidebarOpen(false); }}
+                className={`flex items-center gap-3 px-4 py-3 rounded-full text-base font-medium transition-all
+                  ${activePage === item.page ? 'bg-gray-100 text-black font-semibold' : 'hover:bg-gray-50 text-gray-700'}`}
+              >
+                <span className="text-xl">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-4 py-3 rounded-full text-base font-medium text-red-600 hover:bg-red-50 mt-8"
+            >
+              <FaSignOutAlt className="text-xl" />
+              Logout
+            </button>
+          </nav>
+        </div>
+      </aside>
 
       {/* Top Bar */}
-      <header
-        className="flex items-center justify-between text-white px-6 py-3 shadow-lg border-b border-white/20"
-        style={{
-          backgroundColor: 'var(--neutral-bg-main)', // Use main background from palette
-          color: 'var(--neutral-text-header)',
-          backdropFilter: 'blur(12px)',
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <img src={profile.avatar} alt="avatar" className="w-12 h-12 rounded-full border-2 border-blue-400 shadow-lg" />
-          <div>
-            <div className="font-bold text-lg" style={{ color: 'var(--neutral-text-header)' }}>{profile.name}</div>
-            <div className="text-sm flex items-center gap-1" style={{ color: 'var(--neutral-text-placeholder)' }}>
-              <FaPhoneAlt className="inline mr-1 text-blue-400" />
-              {profile.phone}
+      <div className="border-b border-gray-200 bg-[#E8E6E0]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+          {/* Hamburger for mobile */}
+          <button className="md:hidden text-2xl" onClick={() => setSidebarOpen(true)}>
+            &#9776;
+          </button>
+          {/* Logo and Title */}
+          <div className="flex items-center gap-4">
+            <img src={reactLogo} alt="Logo" className="h-10 w-10 object-contain rounded-xl bg-white p-2 shadow-sm" />
+            <h1 className="text-lg font-semibold text-gray-800">Ambulance Driver</h1>
+          </div>
+          {/* Right - User Info & Actions */}
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden sm:block">
+              <p className="text-sm text-gray-600">Welcome {profile.name}</p>
+              <p className="text-xs text-gray-400">Updated: {new Date().toLocaleTimeString()}</p>
             </div>
+            <img src={AmbulanceDriverImg} alt="Admin" className="h-8 w-8 rounded-full object-cover border-2 border-white shadow" onClick={() => setActivePage('profile')} />
+            <button onClick={handleLogout} title="Logout" className="text-red-600 hover:text-red-800 transition hidden sm:block">
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" /></svg>
+            </button>
           </div>
         </div>
-        <button
-          onClick={handleLogout}
-          className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-white font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
-          onMouseEnter={handleCursorEnter}
-          onMouseLeave={handleCursorLeave}
-        >
-          Logout
-        </button>
-      </header>
+      </div>
 
+      {/* Responsive Navbar */}
+      <div className="w-full max-w-7xl mx-auto">
+        <div className="w-full flex justify-center bg-[#E8E6E0] py-4 sm:py-6">
+          <nav
+            className="bg-[#fef4f4] border border-red-200 rounded-full shadow-lg px-2 sm:px-4 py-2 flex space-x-2 sm:space-x-4 overflow-x-auto max-w-full sm:max-w-3xl"
+            style={{ backgroundColor: '#fff4f4' }}
+          >
+            <motion.button
+              onClick={() => setActivePage('dashboard')}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
+                ${activePage === 'dashboard' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}
+                sm:justify-start`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.97 }}
+              onMouseEnter={handleCursorEnter}
+              onMouseLeave={handleCursorLeave}
+            >
+              <HomeIcon className="h-5 w-5" />
+              <span className="hidden sm:inline">Dashboard</span>
+            </motion.button>
 
-<div className="w-full max-w-7xl mx-auto">
-  {/* Horizontal Navbar - Enhanced Styling */}
-  <nav
-    className="flex flex-row items-center justify-center gap-4 py-4 px-4 border-b border-white/20 shadow-lg"
-    style={{ backgroundColor: 'var(--green-sidebar-accent)' }}
-  >
-    <motion.button
-      onClick={() => setActivePage('dashboard')}
-      className={`flex items-center gap-2 px-5 py-2 rounded-lg font-semibold transition-all duration-200 text-base ${activePage === 'dashboard' ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-white/20 text-white'}`}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.97 }}
-      onMouseEnter={handleCursorEnter}
-      onMouseLeave={handleCursorLeave}
-    >
-      <HomeIcon className="h-5 w-5" /> Dashboard
-    </motion.button>
-    <motion.button
-      onClick={() => setActivePage('history')}
-      className={`flex items-center gap-2 px-5 py-2 rounded-lg font-semibold transition-all duration-200 text-base ${activePage === 'history' ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-white/20 text-white'}`}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.97 }}
-      onMouseEnter={handleCursorEnter}
-      onMouseLeave={handleCursorLeave}
-    >
-      <ClockIcon className="h-5 w-5" /> Booking History
-    </motion.button>
-    <motion.button
-      onClick={() => setActivePage('profile')}
-      className={`flex items-center gap-2 px-5 py-2 rounded-lg font-semibold transition-all duration-200 text-base ${activePage === 'profile' ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-white/20 text-white'}`}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.97 }}
-      onMouseEnter={handleCursorEnter}
-      onMouseLeave={handleCursorLeave}
-    >
-      <UserIcon className="h-5 w-5" /> Profile
-    </motion.button>
-  </nav>
+            <motion.button
+              onClick={() => setActivePage('history')}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
+                ${activePage === 'history' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}
+                sm:justify-start`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.97 }}
+              onMouseEnter={handleCursorEnter}
+              onMouseLeave={handleCursorLeave}
+            >
+              <ClockIcon className="h-5 w-5" />
+              <span className="hidden sm:inline">Booking History</span>
+            </motion.button>
+
+            <motion.button
+              onClick={() => setActivePage('profile')}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all
+                ${activePage === 'profile' ? 'bg-red-100 text-red-700 border-red-300 shadow' : 'bg-transparent text-gray-700 border-transparent hover:bg-red-50 hover:text-red-700'}
+                sm:justify-start`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.97 }}
+              onMouseEnter={handleCursorEnter}
+              onMouseLeave={handleCursorLeave}
+            >
+              <UserIcon className="h-5 w-5" />
+              <span className="hidden sm:inline">Profile</span>
+            </motion.button>
+          </nav>
+        </div>
 
         {/* Main Content */}
-        <main
-          className="flex-1 p-6"
-          style={{ backgroundColor: 'var(--neutral-bg-card)' }} // Use card/section background from palette
-        >
+        <main className="flex-1 p-2 sm:p-6" style={{ backgroundColor: 'var(--neutral-bg-card)' }}>
           {activePage === 'dashboard' && (
             <motion.div variants={containerVariants} initial="hidden" animate="visible">
 
               {/* Location Update Controls */}
-              <motion.div
-                className="bg-white/10 backdrop-blur-md rounded-xl shadow-lg border border-white/20 p-6 mb-6"
-                variants={itemVariants}
-                onMouseEnter={handleCursorEnter}
-                onMouseLeave={handleCursorLeave}
-              >
-                <h3 className="text-lg font-semibold text-black mb-4 flex items-center gap-2">
-                  <MdLocationOn className="text-xl text-blue-400" />
-                  Location Management
-                </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                    <h4 className="text-black font-semibold mb-2">Current Location</h4>
-                    {userLocation ? (
-                      <div className="text-sm text-black/80">
-                        <p>Latitude: {userLocation.latitude.toFixed(6)}</p>
-                        <p>Longitude: {userLocation.longitude.toFixed(6)}</p>
-                        <p className="mt-1 text-xs text-black/60">Address: {currentAddress || "Loading address..."}</p>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-red-400">Location not available</p>
-                    )}
-                  </div>
-
-                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                    <h4 className="text-white font-semibold mb-2">Location Updates</h4>
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => userLocation && handleLocationUpdate(userLocation.latitude, userLocation.longitude)}
-                        disabled={locationUpdateLoading || !userLocation}
-                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
-                      >
-                        {locationUpdateLoading ? 'Updating...' : 'Update Location Now'}
-                      </button>
-
-                      <button
-                        onClick={toggleAutoLocationUpdate}
-                        disabled={!userLocation}
-                        className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${autoLocationUpdate
-                            ? 'bg-red-600 hover:bg-red-700 text-white'
-                            : 'bg-green-600 hover:bg-green-700 text-white'
-                          }`}
-                      >
-                        {autoLocationUpdate ? 'Stop Auto Updates' : 'Start Auto Updates'}
-                      </button>
-                    </div>
-                    {appointment && (
-                      <div className="mt-3 text-xs text-white/80">
-                        <div className="font-semibold">Appointment Address:</div>
-                        <div>{appointmentAddress || "Loading address..."}</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {locationUpdateMessage && (
-                  <motion.div
-                    className={`mt-4 p-3 rounded-lg text-sm border ${locationUpdateMessage.includes('success')
-                        ? 'bg-green-500/20 text-green-300 border-green-500/30'
-                        : 'bg-red-500/20 text-red-300 border-red-500/30'
-                      }`}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                  >
-                    {locationUpdateMessage}
-                  </motion.div>
-                )}
-              </motion.div>
 
 
 
               {error && <div className="mb-4 p-3 rounded-md bg-red-100 text-red-700 border border-red-200 w-full text-center">{error}</div>}
               {loading && <div className="mb-4 text-blue-600 text-center">Loading...</div>}
 
-              {appointment && userLocation ? (
-                <motion.div className="w-full mb-6 rounded-xl shadow-sm border border-gray-200 p-6" variants={itemVariants} style={{ backgroundColor: 'var(--neutral-bg-card)' }}>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                    <MdLocationOn className="text-xl text-blue-600" />
-                    Current Assignment
-                  </h3>
-                  {/* Google Map container */}
-                  <div
-                    ref={googleMapRef}
-                    className="w-full h-80 rounded-lg shadow border mb-4 relative"
-                    style={{ background: "#E6ECE8" }} // fallback bg
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-gray-50 border-l-4 border-gray-300 p-4 rounded-lg">
-                      <div className="font-semibold text-gray-800 mb-1">Appointment Location:</div>
-                      <div className="font-mono text-base text-gray-700">{appointment.latitude}, {appointment.longitude}</div>
-                    </div>
-                    <div className="bg-gray-50 border-l-4 border-gray-300 p-4 rounded-lg">
-                      <div className="font-semibold text-gray-800 mb-1">Your Location:</div>
-                      <div className="font-mono text-base text-gray-700">{userLocation.latitude.toFixed(4)}, {userLocation.longitude.toFixed(4)}</div>
-                    </div>
+              {/* Dashboard Layout: Map (left), Location (right), Recent EN_ROUTE booking */}
+              <motion.div className="background-color: var(--neutral-bg-card); opacity: 1; transform: none;" variants={itemVariants} style={{ backgroundColor: 'var(--neutral-bg-card)' }}>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <MdLocationOn className="text-xl text-blue-600" />
+                  Dashboard Overview
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left: Google Map */}
+                  <div className="bg-gray-50 rounded-xl shadow-lg p-4 flex flex-col items-center justify-center border-2 border-blue-200">
+                    <div className="font-semibold text-gray-800 mb-2">Map View</div>
+                    <div
+                      ref={googleMapRef}
+                      className="w-full h-80 rounded-lg shadow border relative"
+                      style={{ background: "#E6ECE8" }}
+                    />
+                    {userLocation && appointment && (
+                      <div className="mt-4 flex flex-row items-center justify-between w-full gap-4">
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${appointment.latitude},${appointment.longitude}&travelmode=driving`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200 shadow"
+                          style={{ minWidth: '180px', textAlign: 'center' }}
+                        >
+                          Navigate in Google Maps
+                        </a>
+                        {routeInfo && (
+                          <div className="text-sm text-gray-800 bg-blue-50 rounded-lg px-4 py-2 shadow border border-blue-300 min-w-[180px] text-right">
+                            <div><span className="font-semibold">Distance:</span> {routeInfo.distance}</div>
+                            <div><span className="font-semibold">Estimated Time:</span> {routeInfo.duration}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="mt-4 flex flex-col items-center gap-2">
-                    <a
-                      href={`https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${appointment.latitude},${appointment.longitude}&travelmode=driving`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200 shadow"
-                    >
-                      Navigate in Google Maps
-                    </a>
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  className="w-full mb-6 bg-gray-100 p-6 rounded-xl shadow border border-gray-200 text-gray-700 text-center"
-                  variants={itemVariants}
-                >
-                  No active assignment at the moment. Please wait for new requests.
-                </motion.div>
-              )}
+
+{/* Right: Current Location & Recent Booking */}
+<div className="flex flex-col gap-6 bg-white">
+
+  {/* Current Location */}
+  <div className="rounded-xl shadow-lg p-4 bg-green-50">
+    <h4 className="text-green-700 font-bold mb-2 flex items-center gap-2">
+      <MdLocationOn className="text-xl text-green-500" />Current Location
+    </h4>
+    {userLocation ? (
+      <div className="text-base text-black/90 space-y-1">
+        <div className="flex gap-2">
+          <span className="font-semibold text-green-700">Latitude:</span>
+          <span>{userLocation.latitude.toFixed(6)}</span>
+        </div>
+        <div className="flex gap-2">
+          <span className="font-semibold text-green-700">Longitude:</span>
+          <span>{userLocation.longitude.toFixed(6)}</span>
+        </div>
+        <div className="flex gap-2">
+          <span className="font-semibold text-green-700">Address:</span>
+          <span>{currentAddress || "Loading address..."}</span>
+        </div>
+      </div>
+    ) : (
+      <p className="text-base text-red-400">Location not available</p>
+    )}
+  </div>
+
+  {/* Recent EN_ROUTE Booking from History */}
+  <div className="rounded-xl shadow-lg p-4 bg-red-50">
+    <h4 className="text-red-700 font-bold mb-2 flex items-center gap-2">
+      <MdAssignment className="text-xl text-red-500" />Recent Booking (EN_ROUTE)
+    </h4>
+    {history && history.length > 0 ? (
+      (() => {
+        const recentEnRoute = history.find(h => h.status === 'EN_ROUTE');
+        if (recentEnRoute) {
+          return (
+            <div className="text-base text-black/90 space-y-1">
+              <div className="flex gap-2"><span className="font-semibold text-red-700">ID:</span> <span>{recentEnRoute.id}</span></div>
+              <div className="flex gap-2"><span className="font-semibold text-red-700">User ID:</span> <span>{recentEnRoute.userId}</span></div>
+              <div className="flex gap-2"><span className="font-semibold text-red-700">Email:</span> <span>{recentEnRoute.emailOfRequester}</span></div>
+              <div className="flex gap-2"><span className="font-semibold text-red-700">Requested At:</span> <span>{new Date(recentEnRoute.requestedAt).toLocaleString('en-US', {
+                year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+              })}</span></div>
+              <div className="flex gap-2"><span className="font-semibold text-red-700">Location:</span> <span>{recentEnRoute.latitude?.toFixed(4)}, {recentEnRoute.longitude?.toFixed(4)}</span></div>
+              <div className="flex gap-2"><span className="font-semibold text-red-700">Status:</span> <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">{recentEnRoute.status}</span></div>
+            </div>
+          );
+        } else {
+          return <p className="text-base text-gray-500">No EN_ROUTE bookings found.</p>;
+        }
+      })()
+    ) : (
+      <p className="text-base text-gray-500">No booking history found.</p>
+    )}
+  </div>
+
+</div>
+
+                </div>
+              </motion.div>
 
               {appointment && !completed ? (
                 <div className="flex flex-col items-center w-full relative h-32">
@@ -945,8 +968,84 @@ export default function AmbulanceDriverPage() {
                   Booking marked as completed! Ready for next assignment.
                 </motion.div>
               )}
+
+                            <motion.div
+                className="w-full mb-6 rounded-xl shadow-sm border border-gray-200 p-6"
+                variants={itemVariants}
+                onMouseEnter={handleCursorEnter}
+                onMouseLeave={handleCursorLeave}
+              >
+                <h3 className="text-lg font-semibold text-black mb-4 flex items-center gap-2">
+                  <MdLocationOn className="text-xl text-blue-400" />
+                  Location Management
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white rounded-xl border-2 border-white-400 shadow-lg p-4">
+                    <h4 className="text-blue-700 font-bold mb-2 flex items-center gap-2"><MdLocationOn className="text-xl text-blue-500" />Current Location</h4>
+                    {userLocation ? (
+                      <div className="text-base text-black/90 space-y-1">
+                        <div className="flex gap-2"><span className="font-semibold text-blue-700">Latitude:</span> <span>{userLocation.latitude.toFixed(6)}</span></div>
+                        <div className="flex gap-2"><span className="font-semibold text-blue-700">Longitude:</span> <span>{userLocation.longitude.toFixed(6)}</span></div>
+                        <div className="flex gap-2"><span className="font-semibold text-blue-700">Address:</span> <span>{currentAddress || "Loading address..."}</span></div>
+                      </div>
+                    ) : (
+                      <p className="text-base text-red-400">Location not available</p>
+                    )}
+                  </div>
+
+                  <div className="bg-white rounded-xl border-2 border-white-400 shadow-lg p-4">
+                    <h4 className="text-purple-700 font-bold mb-2 flex items-center gap-2"><MdCloud className="text-xl text-purple-500" />Location Updates</h4>
+                    <div className="space-y-2">
+                      <button
+                        onClick={getCurrentLocation}
+                        disabled={locationUpdateLoading}
+                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-3 py-2 rounded-lg text-base font-semibold transition-colors duration-200"
+                      >
+                        {locationUpdateLoading ? 'Updating...' : 'Update Location Now'}
+                      </button>
+
+                      <button
+                        onClick={toggleAutoLocationUpdate}
+                        disabled={!userLocation}
+                        className={`w-full px-3 py-2 rounded-lg text-base font-semibold transition-colors duration-200 ${autoLocationUpdate
+                            ? 'bg-red-600 hover:bg-red-700 text-white'
+                            : 'bg-green-600 hover:bg-green-700 text-white'
+                          }`}
+                      >
+                        {autoLocationUpdate ? 'Stop Auto Updates' : 'Start Auto Updates'}
+                      </button>
+                    </div>
+                    {appointment && (
+                      <div className="mt-3 text-base text-black/90">
+                        <div className="font-semibold text-purple-700">Appointment Address:</div>
+                        <div>{appointmentAddress || "Loading address..."}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {locationUpdateMessage && (
+                  <motion.div
+                    className={`mt-4 p-3 rounded-lg text-sm border ${locationUpdateMessage.includes('success')
+                        ? 'bg-green-500/20 text-green-300 border-green-500/30'
+                        : 'bg-red-500/20 text-red-300 border-red-500/30'
+                      }`}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    {locationUpdateMessage}
+                  </motion.div>
+                )}
+              </motion.div>
             </motion.div>
+
+
+
           )}
+
+
+          
           {activePage === 'history' && (
             <motion.div className="bg-white rounded-xl shadow p-6" variants={containerVariants} initial="hidden" animate="visible">
               <div className="flex items-center justify-between mb-6">
@@ -1062,7 +1161,7 @@ export default function AmbulanceDriverPage() {
 
               {!profileLoading && !profileError && (
                 <div className="flex flex-col items-center gap-4">
-                  <img src={profile.avatar} alt="avatar" className="w-24 h-24 rounded-full border-2 border-blue-400 shadow-md" />
+                  <img src={AmbulanceDriverImg} alt="avatar" className="w-24 h-24 rounded-full border-2 border-blue-400 shadow-md" />
                   <div className="font-bold text-lg text-black">{profile.name}</div>
 
                   <div className="w-full space-y-3">
@@ -1083,7 +1182,7 @@ export default function AmbulanceDriverPage() {
                     {profile.email && (
                       <div className="flex items-center gap-2 text-black/80">
                         <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 012 2h4a2 2 0 012 2v1" />
                         </svg>
                         <span>{profile.email}</span>
                       </div>
