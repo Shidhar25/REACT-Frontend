@@ -1,10 +1,17 @@
 import React from 'react';
 import styled from 'styled-components';
 
-const Button = ({ children, ...props }) => {
+const Button = ({ children, style, ...props }) => {
+  // Check if this is an emergency CTA button (has custom style)
+  const isEmergencyCTA = style && style.background;
+  
   return (
     <StyledWrapper>
-      <button className="button" {...props}>
+      <button 
+        className={`button ${isEmergencyCTA ? 'emergency-cta' : ''}`} 
+        style={style}
+        {...props}
+      >
         {children}
       </button>
     </StyledWrapper>
@@ -13,97 +20,79 @@ const Button = ({ children, ...props }) => {
 
 const StyledWrapper = styled.div`
   .button {
+    padding: 15px 25px;
+    border: unset;
+    border-radius: 15px;
+    color: #212121;
+    z-index: 1;
+    background: #e8e8e8;
     position: relative;
-    padding: 10px 22px;
-    border-radius: 6px;
-    border: none;
-    color: #fff;
+    font-weight: 1000;
+    font-size: 17px;
+    -webkit-box-shadow: 4px 8px 19px -3px rgba(0,0,0,0.27);
+    box-shadow: 4px 8px 19px -3px rgba(0,0,0,0.27);
+    transition: all 250ms;
+    overflow: hidden;
     cursor: pointer;
-    background-color: oklch(51.1% 0.262 276.966); /* indigo-600 */
-    transition: all 0.2s ease;
+    border: none;
+  }
+
+  .button::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0;
+    border-radius: 15px;
+    background-color: #212121;
+    z-index: -1;
+    -webkit-box-shadow: 4px 8px 19px -3px rgba(0,0,0,0.27);
+    box-shadow: 4px 8px 19px -3px rgba(0,0,0,0.27);
+    transition: all 250ms;
+  }
+
+  .button:hover {
+    color: #e8e8e8;
+  }
+
+  .button:hover::before {
+    width: 100%;
   }
 
   .button:active {
-    transform: scale(0.96);
+    transform: scale(0.98);
   }
 
-  .button:before,
-  .button:after {
-    position: absolute;
-    content: "";
-    width: 150%;
-    left: 50%;
-    height: 100%;
-    transform: translateX(-50%);
-    z-index: -1000;
-    background-repeat: no-repeat;
+  /* Emergency CTA Button Styles */
+  .button.emergency-cta {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+    color: #ffffff !important;
+    border: 2px solid #ef4444 !important;
+    box-shadow: 0 8px 25px -3px rgba(239,68,68,0.4), 0 4px 12px -2px rgba(239,68,68,0.2) !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    transition: all 300ms ease !important;
   }
 
-  .button:hover:before {
-    top: -70%;
-    background-image: radial-gradient(circle, oklch(51.1% 0.262 276.966) 20%, transparent 20%),
-      radial-gradient(circle, transparent 20%, oklch(51.1% 0.262 276.966) 20%, transparent 30%),
-      radial-gradient(circle, oklch(51.1% 0.262 276.966) 20%, transparent 20%),
-      radial-gradient(circle, oklch(51.1% 0.262 276.966) 20%, transparent 20%),
-      radial-gradient(circle, transparent 10%, oklch(51.1% 0.262 276.966) 15%, transparent 20%),
-      radial-gradient(circle, oklch(51.1% 0.262 276.966) 20%, transparent 20%),
-      radial-gradient(circle, oklch(51.1% 0.262 276.966) 20%, transparent 20%),
-      radial-gradient(circle, oklch(51.1% 0.262 276.966) 20%, transparent 20%),
-      radial-gradient(circle, oklch(51.1% 0.262 276.966) 20%, transparent 20%);
-    background-size: 10% 10%, 20% 20%, 15% 15%, 20% 20%, 18% 18%, 10% 10%, 15% 15%,
-      10% 10%, 18% 18%;
-    background-position: 50% 120%;
-    animation: greentopBubbles 0.6s ease;
+  .button.emergency-cta::before {
+    background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+    box-shadow: 0 8px 25px -3px rgba(220,38,38,0.6), 0 4px 12px -2px rgba(220,38,38,0.4) !important;
   }
 
-  @keyframes greentopBubbles {
-    0% {
-      background-position: 5% 90%, 10% 90%, 10% 90%, 15% 90%, 25% 90%, 25% 90%,
-        40% 90%, 55% 90%, 70% 90%;
-    }
-
-    50% {
-      background-position: 0% 80%, 0% 20%, 10% 40%, 20% 0%, 30% 30%, 22% 50%,
-        50% 50%, 65% 20%, 90% 30%;
-    }
-
-    100% {
-      background-position: 0% 70%, 0% 10%, 10% 30%, 20% -10%, 30% 20%, 22% 40%,
-        50% 40%, 65% 10%, 90% 20%;
-      background-size: 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%;
-    }
+  .button.emergency-cta:hover {
+    color: #ffffff !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 12px 35px -3px rgba(239,68,68,0.6), 0 8px 20px -2px rgba(239,68,68,0.4) !important;
   }
 
-  .button:hover::after {
-    bottom: -70%;
-    background-image: radial-gradient(circle, oklch(51.1% 0.262 276.966) 20%, transparent 20%),
-      radial-gradient(circle, oklch(51.1% 0.262 276.966) 20%, transparent 20%),
-      radial-gradient(circle, transparent 10%, oklch(51.1% 0.262 276.966) 15%, transparent 20%),
-      radial-gradient(circle, oklch(51.1% 0.262 276.966) 20%, transparent 20%),
-      radial-gradient(circle, oklch(51.1% 0.262 276.966) 20%, transparent 20%),
-      radial-gradient(circle, oklch(51.1% 0.262 276.966) 20%, transparent 20%),
-      radial-gradient(circle, oklch(51.1% 0.262 276.966) 20%, transparent 20%);
-    background-size: 15% 15%, 20% 20%, 18% 18%, 20% 20%, 15% 15%, 20% 20%, 18% 18%;
-    background-position: 50% 0%;
-    animation: greenbottomBubbles 0.6s ease;
+  .button.emergency-cta:hover::before {
+    width: 100% !important;
   }
 
-  @keyframes greenbottomBubbles {
-    0% {
-      background-position: 10% -10%, 30% 10%, 55% -10%, 70% -10%, 85% -10%,
-        70% -10%, 70% 0%;
-    }
-
-    50% {
-      background-position: 0% 80%, 20% 80%, 45% 60%, 60% 100%, 75% 70%, 95% 60%,
-        105% 0%;
-    }
-
-    100% {
-      background-position: 0% 90%, 20% 90%, 45% 70%, 60% 110%, 75% 80%, 95% 70%,
-        110% 10%;
-      background-size: 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%;
-    }
+  .button.emergency-cta:active {
+    transform: translateY(0) scale(0.98) !important;
   }
 `;
 

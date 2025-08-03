@@ -12,4 +12,4 @@ export const HOW_IT_WORKS = [
   { step: '3', title: 'Help Arrives', description: 'Emergency responders arrive at your location with professional medical care.' }
 ];
 
-export const REACT_PHRASES = ["REACT", "Rapid Emergency Action & Coordination Tool"];
+export const REACT_PHRASES = ["Request. Track. Respond"];
