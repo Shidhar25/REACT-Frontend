@@ -51,7 +51,7 @@ public class BookingServiceImpl implements BookingService {
     private final UserRepository userRepository;
     private final EmergencyRequestRepository requestRepo;
     private final BookingLogRepository logRepo;
-    private static final int MAX_RADIUS_KM = 10;
+    private static final int MAX_RADIUS_KM = 25;
 
     @Transactional
     public BookingResponseDto createBooking(BookingRequestDto requestDto, Long requestedById) {
