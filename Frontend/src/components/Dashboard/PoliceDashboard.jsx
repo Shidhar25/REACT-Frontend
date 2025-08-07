@@ -1,7 +1,7 @@
 import { useState, useEffect, use } from 'react';
 import { useNavigate } from 'react-router-dom';
 import reactLogo from '../../assets/react-logo.png';
-import PoliceAdmin from '../../assets/policeAdmin.png';
+import PoliceAdmin from '../../assets/PoliceAdmin.jpg';
 import { motion } from 'framer-motion'; // Import motion
 import StationMap from '../Helper/StationMap';
 import AllStationsMap from '../Helper/AllStationMap';
@@ -1084,7 +1084,7 @@ const fetchEmergencyHistory = async () => {
                 >
                   <StatCard
                     title="Avg Response Time"
-                    value={`${dashboardStats.average_completion_time_minutes} min`}
+                    value={`${dashboardStats.average_completion_time_minutes.toFixed(2)} min`}
                     subtitle="Emergency response"
                     icon={<ClockIcon className="h-6 w-6 text-gray-600" />}
                     bgColorClass="bg-gradient-to-tr from-gray-100 to-white"

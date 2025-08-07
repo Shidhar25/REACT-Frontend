@@ -4,6 +4,10 @@ package com.REACT.backend.users;
 import com.REACT.backend.users.model.SecurityQuestion;
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Getter
 @Setter
@@ -45,6 +49,7 @@ public class AppUser {
 
     @Column(name = "security_answer", nullable = false)
     private String securityAnswer; // hashed
+
 
 
 }

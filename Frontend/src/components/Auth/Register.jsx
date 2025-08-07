@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import LoginImage from '../../assets/login.png';
-import AmbulanceGif from '../../assets/background.gif';
-import { GoogleLogin } from '@react-oauth/google';
+import { useNavigate, Link } from 'react-router-dom';
+import { BellAlertIcon } from '@heroicons/react/24/outline';
+import reactLogo from '../../assets/react-logo.png';
+
 
 const roles = [
   { value: 'USER', label: 'User (Default Requester)' },
@@ -263,219 +263,400 @@ export default function Register() {
     { value: 'MOTHER_MAIDEN_NAME', label: "What is your mother's maiden name?" },
   ];
 
-  const inputClass = (name) => `w-full px-4 py-2 border ${formErrors[name] ? 'border-red-500' : 'border-gray-300'} rounded focus:outline-none focus:ring-2 focus:ring-blue-500`;
-
-return (
-  <div className="min-h-screen relative flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 text-white overflow-hidden">
-    <style>{`
-      .glow-effect {
-        box-shadow:
-          0 0 20px rgba(59, 130, 246, 0.3),
-          0 0 40px rgba(59, 130, 246, 0.2),
-          0 0 60px rgba(59, 130, 246, 0.1),
-          0 0 80px rgba(59, 130, 246, 0.05);
-        animation: glow 3s ease-in-out infinite alternate;
-      }
-      @keyframes glow {
-        from {
-          box-shadow:
-            0 0 20px rgba(59, 130, 246, 0.3),
-            0 0 40px rgba(59, 130, 246, 0.2),
-            0 0 60px rgba(59, 130, 246, 0.1),
-            0 0 80px rgba(59, 130, 246, 0.05);
-        }
-        to {
-          box-shadow:
-            0 0 30px rgba(59, 130, 246, 0.4),
-            0 0 60px rgba(59, 130, 246, 0.3),
-            0 0 90px rgba(59, 130, 246, 0.2),
-            0 0 120px rgba(59, 130, 246, 0.1);
-        }
-      }
-    `}</style>
-    <img src={AmbulanceGif} alt="Ambulance background" className="fixed inset-0 w-full h-full object-cover object-center z-0 select-none pointer-events-none" style={{ filter: 'brightness(0.3) blur(2px)', opacity: 0.4 }} draggable="false" />
-    <div className="flex w-full max-w-4xl bg-white/10 rounded-xl shadow-2xl overflow-hidden relative z-10 border border-white/20 glow-effect">
-      <div className="hidden md:flex flex-col justify-center items-center bg-white/10 p-8 w-1/2">
-        <img src={LoginImage} alt="Register Visual" className="w-64 h-64 object-contain rounded-xl shadow-md" />
-        <div className="mt-6 space-y-3">
-          <GoogleLogin
-            onSuccess={async (credentialResponse) => {
-              console.log('Google OAuth Success:', credentialResponse);
-              await handleOAuthPreFill('google', credentialResponse.credential);
-            }}
-            onError={() => console.log('Google OAuth Error')}
-            useOneTap
-          />
-          <button
-            onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/github'}
-            className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Sign up with GitHub
-          </button>
-        </div>
+  return (
+    <div 
+      className="min-h-screen relative flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 text-white overflow-hidden"
+      style={{
+        background: '#4b6cb7',
+        background: '-webkit-linear-gradient(to bottom, #4b6cb7, #182848)',
+        background: 'linear-gradient(to bottom, #4b6cb7, #182848)',
+        backgroundRepeat: 'no-repeat',
+        backgroundSize: 'cover',
+        backgroundAttachment: 'fixed',
+      }}
+    >
+      {/* Global Background Pattern */}
+      <div className="fixed inset-0 bg-gradient-to-br from-gray-900/50 to-black/50 pointer-events-none"></div>
+      
+      {/* Global Grid Background Pattern */}
+      <div className="fixed inset-0 opacity-15 pointer-events-none">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `
+            linear-gradient(rgba(255,255,255,0.15) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.15) 1px, transparent 1px)
+          `,
+          backgroundSize: '60px 60px'
+        }}></div>
+        {/* Additional larger grid for depth */}
+        <div className="absolute inset-0" style={{
+          backgroundImage: `
+            linear-gradient(rgba(255,255,255,0.08) 2px, transparent 2px),
+            linear-gradient(90deg, rgba(255,255,255,0.08) 2px, transparent 2px)
+          `,
+          backgroundSize: '240px 240px'
+        }}></div>
+        {/* Extra large grid for structure */}
+        <div className="absolute inset-0" style={{
+          backgroundImage: `
+            linear-gradient(rgba(255,255,255,0.05) 3px, transparent 3px),
+            linear-gradient(90deg, rgba(255,255,255,0.05) 3px, transparent 3px)
+          `,
+          backgroundSize: '480px 480px'
+        }}></div>
       </div>
-      <div className="flex-1 flex flex-col justify-center p-8">
-        <div className="bg-white/10 p-6 rounded-lg shadow-xl w-full max-w-sm border border-gray-100 mx-auto">
-          <h2 className="text-2xl font-bold text-center mb-6 text-white">Register</h2>
-          {/* Keep your form fields here as-is */}
-           <form onSubmit={handleSubmit} className="space-y-4">
-               <div>
-                <label className="block mb-1 font-medium text-white">Full Name<br />
-                   <input name="fullName" value={form.fullName} onChange={handleChange} onBlur={handleBlur} required maxLength="100" className={inputClass('fullName')} />
-                   {formErrors.fullName && <p className="mt-1 text-sm text-red-600">{formErrors.fullName}</p>}
-                 </label>
-               </div>
-               <div>
-                <label className="block mb-1 font-medium text-white">Email<br />
-                   <input name="email" type="email" value={form.email} onChange={handleChange} onBlur={handleBlur} required className={inputClass('email')} />
-                   {formErrors.email && <p className="mt-1 text-sm text-red-600">{formErrors.email}</p>}
-                 </label>
-               </div>
-               <div>
-                <label className="block mb-1 font-medium text-white">Phone Number<br />
-                   <input name="phoneNumber" value={form.phoneNumber} onChange={handleChange} onBlur={handleBlur} required maxLength="10" className={inputClass('phoneNumber')} />
-                   {formErrors.phoneNumber && <p className="mt-1 text-sm text-red-600">{formErrors.phoneNumber}</p>}
-                 </label>
-               </div>
-               <div>
-                <label className="block mb-1 font-medium text-white">Government ID (PAN)<br />
-                   <input name="governmentId" value={form.governmentId} onChange={handleChange} onBlur={handleBlur} required maxLength="10" className={inputClass('governmentId')} placeholder="ABCDE1234F" />
-                   {formErrors.governmentId && <p className="mt-1 text-sm text-red-600">{formErrors.governmentId}</p>}
-                 </label>
-               </div>
-               <div>
-                <label className="block mb-1 font-medium text-white">Password<br />
-                   <input name="password" type="password" value={form.password} onChange={handleChange} onBlur={handleBlur} required minLength="6" className={inputClass('password')} />
-                   {formErrors.password && <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>}
-                 </label>
-               </div>
-               <div>
-                <label className="block mb-1 font-medium text-white">Security Question<br />
-                   <select name="securityQuestion" value={form.securityQuestion} onChange={handleChange} onBlur={handleBlur} required className={inputClass('securityQuestion')}>
-                     {securityQuestions.map((q) => (
-                       <option key={q.value} value={q.value}>{q.label}</option>
-                     ))}
-                   </select>
-                 </label>
-               </div>
-               <div>
-                <label className="block mb-1 font-medium text-white">Security Answer<br />
-                   <input name="securityAnswer" value={form.securityAnswer} onChange={handleChange} onBlur={handleBlur} required className={inputClass('securityAnswer')} />
-                   {formErrors.securityAnswer && <p className="mt-1 text-sm text-red-600">{formErrors.securityAnswer}</p>}
-                 </label>
-               </div>
-               <div>
-                <label className="block mb-1 font-medium text-white">Register as:<br />
-                   <select name="role" value={form.role} onChange={handleChange} className={inputClass('role')}>
-                     {roles.map((role) => (
-                       <option key={role.value} value={role.value}>{role.label}</option>
-                     ))}
-                   </select>
-                 </label>
-               </div>
+
+      <div className="w-full max-w-4xl bg-white/10 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden relative z-10 border border-white/20">
+        <div className="flex flex-col justify-center p-6">
+          <div className="max-w-2xl w-full space-y-6 mx-auto py-6 px-6 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10">
+            <div className="text-center">
+              <div className="mx-auto h-12 w-12 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center shadow-lg mb-4">
+              <img src={reactLogo} alt="Login Visual" className="w-20 h-20 object-cover rounded-xl" />
+
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2" style={{
+                fontFamily: 'Inter, system-ui, sans-serif',
+                textShadow: '0 4px 12px rgba(0,0,0,0.3), 0 0 20px rgba(255,255,255,0.3), 0 0 40px rgba(59,130,246,0.2)',
+                filter: 'drop-shadow(0 0 8px rgba(59,130,246,0.4))',
+              }}>
+                Create Account
+              </h2>
+              <p className="text-cyan-100 text-sm font-medium">Join our emergency response network</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-2">Full Name</label>
+                  <input 
+                    name="fullName" 
+                    value={form.fullName} 
+                    onChange={handleChange} 
+                    onBlur={handleBlur}
+                    required 
+                    maxLength="100"
+                    className={`w-full px-3 py-3 border ${formErrors.fullName ? 'border-red-400' : 'border-white/20'} rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder-white/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300`}
+                    placeholder="Enter your full name"
+                  />
+                  {formErrors.fullName && <p className="mt-1 text-sm text-red-300">{formErrors.fullName}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-2">Email Address</label>
+                  <input 
+                    name="email" 
+                    type="email" 
+                    value={form.email} 
+                    onChange={handleChange} 
+                    onBlur={handleBlur}
+                    required 
+                    className={`w-full px-3 py-3 border ${formErrors.email ? 'border-red-400' : 'border-white/20'} rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder-white/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300`}
+                    placeholder="Enter your email"
+                  />
+                  {formErrors.email && <p className="mt-1 text-sm text-red-300">{formErrors.email}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-2">Phone Number</label>
+                  <input 
+                    name="phoneNumber" 
+                    value={form.phoneNumber} 
+                    onChange={handleChange} 
+                    onBlur={handleBlur}
+                    required 
+                    maxLength="10"
+                    className={`w-full px-3 py-3 border ${formErrors.phoneNumber ? 'border-red-400' : 'border-white/20'} rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder-white/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300`}
+                    placeholder="Enter your phone number"
+                  />
+                  {formErrors.phoneNumber && <p className="mt-1 text-sm text-red-300">{formErrors.phoneNumber}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-2">Government ID (PAN)</label>
+                  <input 
+                    name="governmentId" 
+                    value={form.governmentId} 
+                    onChange={handleChange} 
+                    onBlur={handleBlur}
+                    required 
+                    maxLength="10"
+                    className={`w-full px-3 py-3 border ${formErrors.governmentId ? 'border-red-400' : 'border-white/20'} rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder-white/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300`}
+                    placeholder="ABCDE1234F"
+                  />
+                  {formErrors.governmentId && <p className="mt-1 text-sm text-red-300">{formErrors.governmentId}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-2">Password</label>
+                  <input 
+                    name="password" 
+                    type="password" 
+                    value={form.password} 
+                    onChange={handleChange} 
+                    onBlur={handleBlur}
+                    required 
+                    minLength="6"
+                    className={`w-full px-3 py-3 border ${formErrors.password ? 'border-red-400' : 'border-white/20'} rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder-white/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300`}
+                    placeholder="Enter your password"
+                  />
+                  {formErrors.password && <p className="mt-1 text-sm text-red-300">{formErrors.password}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-2">Role</label>
+                  <select 
+                    name="role" 
+                    value={form.role} 
+                    onChange={handleChange} 
+                    className="w-full px-3 py-3 border border-white/20 rounded-lg bg-white/10 backdrop-blur-sm text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300"
+                  >
+                    {roles.map((role) => (
+                      <option key={role.value} value={role.value} className="bg-gray-800 text-white">{role.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-2">Security Question</label>
+                  <select 
+                    name="securityQuestion" 
+                    value={form.securityQuestion} 
+                    onChange={handleChange} 
+                    className="w-full px-3 py-3 border border-white/20 rounded-lg bg-white/10 backdrop-blur-sm text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300"
+                  >
+                    {securityQuestions.map((q) => (
+                      <option key={q.value} value={q.value} className="bg-gray-800 text-white">{q.label}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-2">Security Answer</label>
+                  <input 
+                    name="securityAnswer" 
+                    value={form.securityAnswer} 
+                    onChange={handleChange} 
+                    onBlur={handleBlur}
+                    required 
+                    className={`w-full px-3 py-3 border ${formErrors.securityAnswer ? 'border-red-400' : 'border-white/20'} rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder-white/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300`}
+                    placeholder="Enter your answer"
+                  />
+                  {formErrors.securityAnswer && <p className="mt-1 text-sm text-red-300">{formErrors.securityAnswer}</p>}
+                </div>
+              </div>
               
-               {/* Ambulance Driver fields */}
-               {form.role === 'AMBULANCE_DRIVER' && (
-                 <>
-                   <div>
-                    <label className="block mb-1 font-medium text-white">License Number<br />
-                       <input name="licenseNumber" value={form.licenseNumber} onChange={handleChange} onBlur={handleBlur} required maxLength="17" className={inputClass('licenseNumber')} placeholder="KA01 20200012345" />
-                       {formErrors.licenseNumber && <p className="mt-1 text-sm text-red-600">{formErrors.licenseNumber}</p>}
-                     </label>
-                   </div>
-                   <div>
-                    <label className="block mb-1 font-medium text-white">Vehicle Registration Number<br />
-                       <input name="vehicleRegNumber" value={form.vehicleRegNumber} onChange={handleChange} onBlur={handleBlur} required maxLength="10" className={inputClass('vehicleRegNumber')} placeholder="MH12AB1234" />
-                       {formErrors.vehicleRegNumber && <p className="mt-1 text-sm text-red-600">{formErrors.vehicleRegNumber}</p>}
-                     </label>
-                   </div>
-                   <div>
-                    <label className="block mb-1 font-medium text-white">Hospital ID<br />
-                       <input name="hospitalID" type="number" value={form.hospitalID} onChange={handleChange} onBlur={handleBlur} required min="1" className={inputClass('hospitalID')} />
-                       {formErrors.hospitalID && <p className="mt-1 text-sm text-red-600">{formErrors.hospitalID}</p>}
-                     </label>
-                   </div>
-                 </>
-               )}
+              {/* Ambulance Driver fields */}
+              {form.role === 'AMBULANCE_DRIVER' && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-white mb-2">License Number</label>
+                    <input 
+                      name="licenseNumber" 
+                      value={form.licenseNumber} 
+                      onChange={handleChange} 
+                      onBlur={handleBlur}
+                      required 
+                      maxLength="17"
+                      className={`w-full px-3 py-3 border ${formErrors.licenseNumber ? 'border-red-400' : 'border-white/20'} rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder-white/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300`}
+                      placeholder="KA01 20200012345"
+                    />
+                    {formErrors.licenseNumber && <p className="mt-1 text-sm text-red-300">{formErrors.licenseNumber}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-white mb-2">Vehicle Registration</label>
+                    <input 
+                      name="vehicleRegNumber" 
+                      value={form.vehicleRegNumber} 
+                      onChange={handleChange} 
+                      onBlur={handleBlur}
+                      required 
+                      maxLength="10"
+                      className={`w-full px-3 py-3 border ${formErrors.vehicleRegNumber ? 'border-red-400' : 'border-white/20'} rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder-white/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300`}
+                      placeholder="MH12AB1234"
+                    />
+                    {formErrors.vehicleRegNumber && <p className="mt-1 text-sm text-red-300">{formErrors.vehicleRegNumber}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-white mb-2">Hospital ID</label>
+                    <input 
+                      name="hospitalID" 
+                      type="number" 
+                      value={form.hospitalID} 
+                      onChange={handleChange} 
+                      onBlur={handleBlur}
+                      required 
+                      min="1"
+                      className={`w-full px-3 py-3 border ${formErrors.hospitalID ? 'border-red-400' : 'border-white/20'} rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder-white/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300`}
+                      placeholder="Enter hospital ID"
+                    />
+                    {formErrors.hospitalID && <p className="mt-1 text-sm text-red-300">{formErrors.hospitalID}</p>}
+                  </div>
+                </div>
+              )}
               
-               {/* Fire Driver fields */}
-               {form.role === 'FIRE_DRIVER' && (
-                 <>
-                   <div>
-                    <label className="block mb-1 font-medium text-white">License Number<br />
-                       <input name="licenseNumber" value={form.licenseNumber} onChange={handleChange} onBlur={handleBlur} required maxLength="17" className={inputClass('licenseNumber')} placeholder="KA01 20200012345" />
-                       {formErrors.licenseNumber && <p className="mt-1 text-sm text-red-600">{formErrors.licenseNumber}</p>}
-                     </label>
-                   </div>
-                   <div>
-                    <label className="block mb-1 font-medium text-white">Vehicle Registration Number<br />
-                       <input name="vehicleRegNumber" value={form.vehicleRegNumber} onChange={handleChange} onBlur={handleBlur} required maxLength="10" className={inputClass('vehicleRegNumber')} placeholder="MH12AB1234" />
-                       {formErrors.vehicleRegNumber && <p className="mt-1 text-sm text-red-600">{formErrors.vehicleRegNumber}</p>}
-                     </label>
-                   </div>
-                   <div>
-                    <label className="block mb-1 font-medium text-white">Fire Station ID<br />
-                       <input name="fireStationId" type="number" value={form.fireStationId} onChange={handleChange} onBlur={handleBlur} required min="1" className={inputClass('fireStationId')} />
-                       {formErrors.fireStationId && <p className="mt-1 text-sm text-red-600">{formErrors.fireStationId}</p>}
-                     </label>
-                   </div>
-                 </>
-               )}
+              {/* Fire Driver fields */}
+              {form.role === 'FIRE_DRIVER' && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-white mb-2">License Number</label>
+                    <input 
+                      name="licenseNumber" 
+                      value={form.licenseNumber} 
+                      onChange={handleChange} 
+                      onBlur={handleBlur}
+                      required 
+                      maxLength="17"
+                      className={`w-full px-3 py-3 border ${formErrors.licenseNumber ? 'border-red-400' : 'border-white/20'} rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder-white/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300`}
+                      placeholder="KA01 20200012345"
+                    />
+                    {formErrors.licenseNumber && <p className="mt-1 text-sm text-red-300">{formErrors.licenseNumber}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-white mb-2">Vehicle Registration</label>
+                    <input 
+                      name="vehicleRegNumber" 
+                      value={form.vehicleRegNumber} 
+                      onChange={handleChange} 
+                      onBlur={handleBlur}
+                      required 
+                      maxLength="10"
+                      className={`w-full px-3 py-3 border ${formErrors.vehicleRegNumber ? 'border-red-400' : 'border-white/20'} rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder-white/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300`}
+                      placeholder="MH12AB1234"
+                    />
+                    {formErrors.vehicleRegNumber && <p className="mt-1 text-sm text-red-300">{formErrors.vehicleRegNumber}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-white mb-2">Fire Station ID</label>
+                    <input 
+                      name="fireStationId" 
+                      type="number" 
+                      value={form.fireStationId} 
+                      onChange={handleChange} 
+                      onBlur={handleBlur}
+                      required 
+                      min="1"
+                      className={`w-full px-3 py-3 border ${formErrors.fireStationId ? 'border-red-400' : 'border-white/20'} rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder-white/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300`}
+                      placeholder="Enter fire station ID"
+                    />
+                    {formErrors.fireStationId && <p className="mt-1 text-sm text-red-300">{formErrors.fireStationId}</p>}
+                  </div>
+                </div>
+              )}
               
-               {/* Police Officer fields */}
-               {form.role === 'POLICE_OFFICER' && (
-                 <div>
-                  <label className="block mb-1 font-medium text-white">Police Station ID<br />
-                     <input name="policeStationId" type="number" value={form.policeStationId} onChange={handleChange} onBlur={handleBlur} required min="1" className={inputClass('policeStationId')} />
-                     {formErrors.policeStationId && <p className="mt-1 text-sm text-red-600">{formErrors.policeStationId}</p>}
-                   </label>
-                 </div>
-               )}
+              {/* Police Officer fields */}
+              {form.role === 'POLICE_OFFICER' && (
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-2">Police Station ID</label>
+                  <input 
+                    name="policeStationId" 
+                    type="number" 
+                    value={form.policeStationId} 
+                    onChange={handleChange} 
+                    onBlur={handleBlur}
+                    required 
+                    min="1"
+                    className={`w-full px-3 py-3 border ${formErrors.policeStationId ? 'border-red-400' : 'border-white/20'} rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder-white/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300`}
+                    placeholder="Enter police station ID"
+                  />
+                  {formErrors.policeStationId && <p className="mt-1 text-sm text-red-300">{formErrors.policeStationId}</p>}
+                </div>
+              )}
                
-               {/* Admin fields */}
-               {form.role === 'ADMIN' && (
-                 <>
-                   <div>
-                    <label className="block mb-1 font-medium text-white">License Number<br />
-                       <input name="licenseNumber" value={form.licenseNumber} onChange={handleChange} onBlur={handleBlur} required maxLength="20" className={inputClass('licenseNumber')} placeholder="MH-FIRE-0234" />
-                       {formErrors.licenseNumber && <p className="mt-1 text-sm text-red-600">{formErrors.licenseNumber}</p>}
-                     </label>
-                   </div>
-                   <div>
-                    <label className="block mb-1 font-medium text-white">Vehicle Registration Number<br />
-                       <input name="vehicleRegNumber" value={form.vehicleRegNumber} onChange={handleChange} onBlur={handleBlur} required maxLength="10" className={inputClass('vehicleRegNumber')} placeholder="MH15BA3254" />
-                       {formErrors.vehicleRegNumber && <p className="mt-1 text-sm text-red-600">{formErrors.vehicleRegNumber}</p>}
-                     </label>
-                   </div>
-                   <div>
-                    <label className="block mb-1 font-medium text-white">Fire Station ID<br />
-                       <input name="fireStationId" type="number" value={form.fireStationId} onChange={handleChange} onBlur={handleBlur} required min="1" className={inputClass('fireStationId')} />
-                       {formErrors.fireStationId && <p className="mt-1 text-sm text-red-600">{formErrors.fireStationId}</p>}
-                     </label>
-                   </div>
-                 </>
-               )}
-              
-               <button type="submit" disabled={loading} className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors shadow-md">
-                 {loading ? 'Registering...' : 'Register'}
-               </button>
-             </form>
-          {/* Submit button and error message */}
-          <button type="submit" disabled={loading} className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors shadow-md">
-            {loading ? 'Registering...' : 'Register'}
-          </button>
-          {message && <p className={`mt-4 text-center text-sm transition-opacity duration-300 ${message.includes('success') ? 'text-green-600' : 'text-red-500'}`}>{message}</p>}
-          <div className="mt-4 text-center">
-            <span className="text-white">Already have an account? </span>
-            <a href="/" className="text-blue-600 hover:underline">Login</a>
+              {/* Admin fields */}
+              {form.role === 'ADMIN' && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-white mb-2">License Number</label>
+                    <input 
+                      name="licenseNumber" 
+                      value={form.licenseNumber} 
+                      onChange={handleChange} 
+                      onBlur={handleBlur}
+                      required 
+                      maxLength="20"
+                      className={`w-full px-3 py-3 border ${formErrors.licenseNumber ? 'border-red-400' : 'border-white/20'} rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder-white/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300`}
+                      placeholder="MH-FIRE-0234"
+                    />
+                    {formErrors.licenseNumber && <p className="mt-1 text-sm text-red-300">{formErrors.licenseNumber}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-white mb-2">Vehicle Registration</label>
+                    <input 
+                      name="vehicleRegNumber" 
+                      value={form.vehicleRegNumber} 
+                      onChange={handleChange} 
+                      onBlur={handleBlur}
+                      required 
+                      maxLength="10"
+                      className={`w-full px-3 py-3 border ${formErrors.vehicleRegNumber ? 'border-red-400' : 'border-white/20'} rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder-white/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300`}
+                      placeholder="MH15BA3254"
+                    />
+                    {formErrors.vehicleRegNumber && <p className="mt-1 text-sm text-red-300">{formErrors.vehicleRegNumber}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-white mb-2">Fire Station ID</label>
+                    <input 
+                      name="fireStationId" 
+                      type="number" 
+                      value={form.fireStationId} 
+                      onChange={handleChange} 
+                      onBlur={handleBlur}
+                      required 
+                      min="1"
+                      className={`w-full px-3 py-3 border ${formErrors.fireStationId ? 'border-red-400' : 'border-white/20'} rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder-white/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all duration-300`}
+                      placeholder="Enter fire station ID"
+                    />
+                    {formErrors.fireStationId && <p className="mt-1 text-sm text-red-300">{formErrors.fireStationId}</p>}
+                  </div>
+                </div>
+              )}
+
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 text-white py-3 px-4 rounded-lg font-bold hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 disabled:transform-none"
+              >
+                {loading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    Creating account...
+                  </div>
+                ) : (
+                  'Create Account'
+                )}
+              </button>
+
+              {message && (
+                <div className={`px-4 py-3 rounded-lg text-sm backdrop-blur-sm ${
+                  message.includes('success') 
+                    ? 'bg-green-500/20 border border-green-300/30 text-green-200' 
+                    : 'bg-red-500/20 border border-red-300/30 text-red-200'
+                }`}>
+                  {message}
+                </div>
+              )}
+            </form>
+
+            <div className="mt-6 text-center">
+              <span className="text-white/80">Already have an account? </span>
+              <Link to="/login" className="font-semibold text-cyan-300 hover:text-cyan-200 transition-colors">Sign in</Link>
+            </div>
+
+            <div className="text-center mt-6 pt-4 border-t border-white/10">
+              <button 
+                onClick={() => navigate('/')} 
+                className="text-cyan-300 hover:text-cyan-200 text-sm font-semibold transition-colors flex items-center justify-center mx-auto"
+              >
+                ← Back to Home
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
-);
-
- }
+  );
+}
 
 
 

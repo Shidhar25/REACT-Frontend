@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { FaAmbulance, FaFireExtinguisher, FaUserShield } from 'react-icons/fa';
+import registerImage from "../pages/registerImage.png"
 
 const roles = ["USER", "ADMIN"];
 const userTypes = [
@@ -100,19 +101,19 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-red-100 relative overflow-hidden">
-      {/* Emergency SVG/Icons background */}
-      <div className="absolute inset-0 pointer-events-none opacity-10 flex justify-center items-center z-0">
-        <FaAmbulance size={180} className="text-red-400 mx-8" />
-        <FaFireExtinguisher size={140} className="text-orange-400 mx-8" />
-        <FaUserShield size={140} className="text-blue-400 mx-8" />
-      </div>
-      <div className="bg-white/90 rounded-3xl shadow-2xl p-10 w-full max-w-md z-10 border-t-8 border-red-500">
-        <div className="flex flex-col items-center mb-6">
-          <FaAmbulance size={48} className="text-red-500 mb-2 animate-pulse" />
-          <h1 className="text-3xl font-extrabold text-red-600 tracking-tight mb-1 drop-shadow">Emergency Response Portal</h1>
-          <div className="text-blue-700 text-base font-medium mb-2 text-center">One platform for Ambulance, Fire, and Police emergencies</div>
-        </div>
+  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-red-100 relative overflow-hidden">
+    {/* Emergency SVG/Icons background */}
+    <div className="absolute inset-0 pointer-events-none opacity-10 flex justify-center items-center z-0">
+      <FaAmbulance size={180} className="text-red-400 mx-8" />
+      <FaFireExtinguisher size={140} className="text-orange-400 mx-8" />
+      <FaUserShield size={140} className="text-blue-400 mx-8" />
+    </div>
+
+    {/* Main Flex Container */}
+    <div className="relative z-10 flex flex-col md:flex-row items-center md:items-stretch max-w-4xl w-full p-4 md:p-0">
+      
+      {/* Form Section */}
+      <div className="bg-white/90 rounded-3xl shadow-2xl p-10 w-full md:w-1/2 border-t-8 border-red-500">
         <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
           {isSignup ? "Create Your Account" : "Sign In to Continue"}
         </h2>
@@ -204,7 +205,11 @@ export default function Login() {
               </select>
             </div>
           </div>
-          {error && <div className="text-red-500 text-sm text-center font-semibold">{error}</div>}
+          {error && (
+            <div className="text-red-500 text-sm text-center font-semibold">
+              {error}
+            </div>
+          )}
           <button
             type="submit"
             className="w-full bg-gradient-to-r from-red-500 to-blue-600 text-white py-2 rounded-xl font-bold shadow-lg hover:from-red-600 hover:to-blue-700 transition"
@@ -220,10 +225,18 @@ export default function Login() {
             {isSignup ? "Already have an account? Login" : "Don't have an account? Sign Up"}
           </button>
         </div>
-        <div className="mt-8 text-center text-xs text-gray-500">
-          &copy; {new Date().getFullYear()} Emergency Response Portal. All rights reserved.
-        </div>
+      </div>
+
+      {/* Image Section */}
+      <div className="hidden md:flex w-1/2 items-center justify-center p-8">
+        <img
+          src={registerImage}
+          alt="Register Visual"
+          className="w-full h-auto object-cover rounded-3xl shadow-xl transition-transform duration-300 hover:scale-105"
+        />
       </div>
     </div>
-  );
+  </div>
+);
+
 } 

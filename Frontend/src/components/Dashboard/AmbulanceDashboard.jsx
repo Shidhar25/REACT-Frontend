@@ -1042,7 +1042,7 @@ const fetchAddresses = async () => {
                     />
                     <StatCard
                       title="Avg Time"
-                      value={`${dashboardStats.average_completion_time_minutes} min`}
+                      value={`${dashboardStats.average_completion_time_minutes.toFixed(2)} min`}
                       subtitle="Completion"
                       icon={<ClockIcon className="h-6 w-6 text-gray-700" />}
                       bgColorClass="bg-gradient-to-tr from-gray-100 to-white"
