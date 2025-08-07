@@ -142,6 +142,7 @@ public class AmbulanceDriverServiceImpl {
             log.error("Ambulance status map is null for booking ID {}", thisEntity.getId());
             throw new IllegalStateException("Invalid booking state: no ambulance status map present.");
         }
+        thisEntity.getAmbulanceStatusMap().put(ambulance,AmbulanceStatus.COMPLETED);
         emergencyRequestRepo.save(thisEntity);
         log.info("done updating status");
 
