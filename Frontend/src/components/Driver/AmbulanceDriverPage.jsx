@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { FaAmbulance, FaPhoneAlt, FaStar, FaCheckCircle, FaSignOutAlt } from 'react-icons/fa';
+import { FaAmbulance, FaPhoneAlt, FaStar, FaCheckCircle, FaSignOutAlt, FaUserShield } from 'react-icons/fa';
 import { MdAccessTime, MdCloud, MdAssignment, MdLocalHospital, MdLocationOn } from 'react-icons/md';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import AmbulanceDriverImg from '../../assets/ambulanceDriver.png';
-import { UserIcon, HomeIcon, ClockIcon, MapIcon as MapOutlineIcon } from '@heroicons/react/24/outline';
+import { UserIcon,ClipboardDocumentCheckIcon, HomeIcon, ClockIcon, MapIcon as MapOutlineIcon } from '@heroicons/react/24/outline';
+import { ClipboardCheck, ShieldCheck, User, Phone, Mail, Fingerprint, IdCard } from 'lucide-react';
+
 
 import reactLogo from '../../assets/react-logo.png';
 
@@ -59,6 +61,16 @@ const cardVariants = {
   hover: { scale: 1.02, boxShadow: "0px 8px 16px rgba(255, 255, 255, 0.1)" },
 };
 
+  const ProfileItem = ({ icon, label, value }) => (
+  <div className="flex items-center space-x-3 pt-2">
+    <div className="w-5 h-5">{icon}</div>
+    <div className="flex justify-between w-full">
+      <span className="text-gray-500">{label}:</span>
+      <span className="font-medium text-gray-800">{value}</span>
+    </div>
+  </div>
+);
+
 const completionOverlayVariants = {
   hidden: { x: "100%", opacity: 0 },
   visible: { x: "0%", opacity: 1, transition: { type: "spring", stiffness: 100, damping: 20 } },
@@ -81,6 +93,7 @@ export default function AmbulanceDriverPage() {
   const [profileError, setProfileError] = useState('');
   const [currentAddress, setCurrentAddress] = useState('');
   const [appointmentAddress, setAppointmentAddress] = useState('');
+  let [ambulanceStatus, setAmbulanceStatus] = useState('');
 
   // History states
   const [history, setHistory] = useState([]);
@@ -181,6 +194,8 @@ export default function AmbulanceDriverPage() {
     }
   };
 
+  
+
   // Fetch history from API and then fetch booking details for EN_ROUTE
   const fetchHistory = async () => {
     console.log('Fetching history from API...');
@@ -228,7 +243,9 @@ export default function AmbulanceDriverPage() {
               const bookingData = await bookingRes.json();
               // If bookingData.assignedAmbulances exists, set userLocation to the first ambulance's location
               if (bookingData.assignedAmbulances && bookingData.assignedAmbulances.length > 0) {
-                const ambulance = bookingData.assignedAmbulances[0];
+                const ambulance = bookingData.assignedAmbulances[0];  
+                ambulanceStatus = ambulance.status; // Assuming the ambulance is completed
+                setAmbulanceStatus(ambulanceStatus);
                 setUserLocation({ latitude: ambulance.latitude, longitude: ambulance.longitude });
                 toast.info('Ambulance driver location updated from booking data.');
               }
@@ -372,6 +389,7 @@ export default function AmbulanceDriverPage() {
 
       if (res.ok) {
         setCompleted(true);
+        setAmbulanceStatus('AVAILABLE');
         setAppointment(null);
         toast.success('Booking marked as completed!');
       } else {
@@ -655,7 +673,7 @@ export default function AmbulanceDriverPage() {
       </aside>
 
       {/* Top Bar */}
-      <div className="border-b border-gray-200 bg-[#E8E6E0]">
+      <div className="">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           {/* Hamburger for mobile */}
           <button className="md:hidden text-2xl" onClick={() => setSidebarOpen(true)}>
@@ -669,7 +687,7 @@ export default function AmbulanceDriverPage() {
           {/* Right - User Info & Actions */}
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
-              <p className="text-sm text-gray-600">Welcome {profile.name}</p>
+              <p className="text-sm text-gray-600">Hi, {profile.name} !</p>
               <p className="text-xs text-gray-400">Updated: {new Date().toLocaleTimeString()}</p>
             </div>
             <img src={AmbulanceDriverImg} alt="Admin" className="h-8 w-8 rounded-full object-cover border-2 border-white shadow" onClick={() => setActivePage('profile')} />
@@ -682,10 +700,10 @@ export default function AmbulanceDriverPage() {
 
       {/* Responsive Navbar */}
       <div className="w-full max-w-7xl mx-auto">
-        <div className="w-full flex justify-center bg-[#E8E6E0] py-4 sm:py-6">
+        <div className="w-full flex justify-center py-4 sm:py-6">
           <nav
             className="bg-[#fef4f4] border border-red-200 rounded-full shadow-lg px-2 sm:px-4 py-2 flex space-x-2 sm:space-x-4 overflow-x-auto max-w-full sm:max-w-3xl"
-            style={{ backgroundColor: '#fff4f4' }}
+            
           >
             <motion.button
               onClick={() => setActivePage('dashboard')}
@@ -780,65 +798,65 @@ export default function AmbulanceDriverPage() {
                     )}
                   </div>
 
-{/* Right: Current Location & Recent Booking */}
-<div className="flex flex-col gap-6 bg-white">
+                  {/* Right: Current Location & Recent Booking */}
+                  <div className="flex flex-col gap-6 bg-white">
 
-  {/* Current Location */}
-  <div className="rounded-xl shadow-lg p-4 bg-green-50">
-    <h4 className="text-green-700 font-bold mb-2 flex items-center gap-2">
-      <MdLocationOn className="text-xl text-green-500" />Current Location
-    </h4>
-    {userLocation ? (
-      <div className="text-base text-black/90 space-y-1">
-        <div className="flex gap-2">
-          <span className="font-semibold text-green-700">Latitude:</span>
-          <span>{userLocation.latitude.toFixed(6)}</span>
-        </div>
-        <div className="flex gap-2">
-          <span className="font-semibold text-green-700">Longitude:</span>
-          <span>{userLocation.longitude.toFixed(6)}</span>
-        </div>
-        <div className="flex gap-2">
-          <span className="font-semibold text-green-700">Address:</span>
-          <span>{currentAddress || "Loading address..."}</span>
-        </div>
-      </div>
-    ) : (
-      <p className="text-base text-red-400">Location not available</p>
-    )}
-  </div>
+                    {/* Current Location */}
+                    <div className="rounded-xl shadow-lg p-4 bg-green-50">
+                      <h4 className="text-green-700 font-bold mb-2 flex items-center gap-2">
+                        <MdLocationOn className="text-xl text-green-500" />Current Location
+                      </h4>
+                      {userLocation ? (
+                        <div className="text-base text-black/90 space-y-1">
+                          <div className="flex gap-2">
+                            <span className="font-semibold text-green-700">Latitude:</span>
+                            <span>{userLocation.latitude.toFixed(6)}</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <span className="font-semibold text-green-700">Longitude:</span>
+                            <span>{userLocation.longitude.toFixed(6)}</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <span className="font-semibold text-green-700">Address:</span>
+                            <span>{currentAddress || "Loading address..."}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-base text-red-400">Location not available</p>
+                      )}
+                    </div>
 
-  {/* Recent EN_ROUTE Booking from History */}
-  <div className="rounded-xl shadow-lg p-4 bg-red-50">
-    <h4 className="text-red-700 font-bold mb-2 flex items-center gap-2">
-      <MdAssignment className="text-xl text-red-500" />Recent Booking (EN_ROUTE)
-    </h4>
-    {history && history.length > 0 ? (
-      (() => {
-        const recentEnRoute = history.find(h => h.status === 'EN_ROUTE');
-        if (recentEnRoute) {
-          return (
-            <div className="text-base text-black/90 space-y-1">
-              <div className="flex gap-2"><span className="font-semibold text-red-700">ID:</span> <span>{recentEnRoute.id}</span></div>
-              <div className="flex gap-2"><span className="font-semibold text-red-700">User ID:</span> <span>{recentEnRoute.userId}</span></div>
-              <div className="flex gap-2"><span className="font-semibold text-red-700">Email:</span> <span>{recentEnRoute.emailOfRequester}</span></div>
-              <div className="flex gap-2"><span className="font-semibold text-red-700">Requested At:</span> <span>{new Date(recentEnRoute.requestedAt).toLocaleString('en-US', {
-                year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-              })}</span></div>
-              <div className="flex gap-2"><span className="font-semibold text-red-700">Location:</span> <span>{recentEnRoute.latitude?.toFixed(4)}, {recentEnRoute.longitude?.toFixed(4)}</span></div>
-              <div className="flex gap-2"><span className="font-semibold text-red-700">Status:</span> <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">{recentEnRoute.status}</span></div>
-            </div>
-          );
-        } else {
-          return <p className="text-base text-gray-500">No EN_ROUTE bookings found.</p>;
-        }
-      })()
-    ) : (
-      <p className="text-base text-gray-500">No booking history found.</p>
-    )}
-  </div>
+                    {/* Recent EN_ROUTE Booking from History */}
+                    <div className="rounded-xl shadow-lg p-4 bg-red-50">
+                      <h4 className="text-red-700 font-bold mb-2 flex items-center gap-2">
+                        <MdAssignment className="text-xl text-red-500" />Recent Booking
+                      </h4>
+                      {history && history.length > 0 ? (
+                        (() => {
+                          const recentEnRoute = history.find(h => h.status === 'EN_ROUTE');
+                          if (recentEnRoute) {
+                            return (
+                              <div className="text-base text-black/90 space-y-1">
+                                <div className="flex gap-2"><span className="font-semibold text-red-700">ID:</span> <span>{recentEnRoute.id}</span></div>
+                                <div className="flex gap-2"><span className="font-semibold text-red-700">User ID:</span> <span>{recentEnRoute.userId}</span></div>
+                                <div className="flex gap-2"><span className="font-semibold text-red-700">Email:</span> <span>{recentEnRoute.emailOfRequester}</span></div>
+                                <div className="flex gap-2"><span className="font-semibold text-red-700">Requested At:</span> <span>{new Date(recentEnRoute.requestedAt).toLocaleString('en-US', {
+                                  year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                })}</span></div>
+                                <div className="flex gap-2"><span className="font-semibold text-red-700">Location:</span> <span>{recentEnRoute.latitude?.toFixed(4)}, {recentEnRoute.longitude?.toFixed(4)}</span></div>
+                                <div className="flex gap-2"><span className="font-semibold text-red-700">Status:</span> <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">{ambulanceStatus}</span></div>
+                              </div>
+                            );
+                          } else {
+                            return <p className="text-base text-gray-500">No EN_ROUTE bookings found.</p>;
+                          }
+                        })()
+                      ) : (
+                        <p className="text-base text-gray-500">No booking history found.</p>
+                      )}
+                    </div>
 
-</div>
+                  </div>
 
                 </div>
               </motion.div>
@@ -864,7 +882,7 @@ export default function AmbulanceDriverPage() {
                       </div>
                     </motion.div>
                   )}
-
+                  {ambulanceStatus === "EN_ROUTE" && (
                   <motion.div className="mb-4 w-full flex flex-col items-center" variants={itemVariants}>
                     <label className="block text-gray-700 font-medium mb-2">Slide to Complete Task</label>
                     <div className="w-72 p-4 bg-gray-50 rounded-2xl shadow flex flex-col items-center relative transition-all duration-300">
@@ -880,58 +898,58 @@ export default function AmbulanceDriverPage() {
                         style={{ accentColor: '#2563eb' }}
                       />
                       {/* Custom thumb with arrow */}
-<style>{`
-  input[type='range']::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: #2563eb;
-    box-shadow: 0 2px 8px rgba(37,99,235,0.15);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s;
-    position: relative;
-  }
-  input[type='range']:focus::-webkit-slider-thumb {
-    outline: 2px solid #2563eb;
-  }
-  input[type='range']::-webkit-slider-thumb::before {
-    content: '';
-    display: block;
-    position: absolute;
-    left: 8px;
-    top: 7px;
-    width: 0;
-    height: 0;
-    border-top: 7px solid transparent;
-    border-bottom: 7px solid transparent;
-    border-left: 12px solid #fff;
-  }
-  input[type='range']::-webkit-slider-thumb::after {
-    display: none;
-  }
-  input[type='range']::-moz-range-thumb {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: #2563eb;
-    box-shadow: 0 2px 8px rgba(37,99,235,0.15);
-    border: none;
-    position: relative;
-  }
-  input[type='range']:focus::-moz-range-thumb {
-    outline: 2px solid #2563eb;
-  }
-  input[type='range']::-moz-range-thumb {
-    background: #2563eb url('data:image/svg+xml;utf8,<svg width="18" height="18" xmlns="http://www.w3.org/2000/svg"><polygon points="6,3 16,9 6,15" fill="white"/></svg>') no-repeat center center;
-    background-size: 18px 18px;
-  }
-  /* Hide the default arrow for Firefox */
-  input[type='range']::-moz-focus-outer { border: 0; }
-`}</style>
+                      <style>{`
+                        input[type='range']::-webkit-slider-thumb {
+                          -webkit-appearance: none;
+                          appearance: none;
+                          width: 28px;
+                          height: 28px;
+                          border-radius: 50%;
+                          background: #2563eb;
+                          box-shadow: 0 2px 8px rgba(37,99,235,0.15);
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          transition: background 0.2s;
+                          position: relative;
+                        }
+                        input[type='range']:focus::-webkit-slider-thumb {
+                          outline: 2px solid #2563eb;
+                        }
+                        input[type='range']::-webkit-slider-thumb::before {
+                          content: '';
+                          display: block;
+                          position: absolute;
+                          left: 8px;
+                          top: 7px;
+                          width: 0;
+                          height: 0;
+                          border-top: 7px solid transparent;
+                          border-bottom: 7px solid transparent;
+                          border-left: 12px solid #fff;
+                        }
+                        input[type='range']::-webkit-slider-thumb::after {
+                          display: none;
+                        }
+                        input[type='range']::-moz-range-thumb {
+                          width: 28px;
+                          height: 28px;
+                          border-radius: 50%;
+                          background: #2563eb;
+                          box-shadow: 0 2px 8px rgba(37,99,235,0.15);
+                          border: none;
+                          position: relative;
+                        }
+                        input[type='range']:focus::-moz-range-thumb {
+                          outline: 2px solid #2563eb;
+                        }
+                        input[type='range']::-moz-range-thumb {
+                          background: #2563eb url('data:image/svg+xml;utf8,<svg width="18" height="18" xmlns="http://www.w3.org/2000/svg"><polygon points="6,3 16,9 6,15" fill="white"/></svg>') no-repeat center center;
+                          background-size: 18px 18px;
+                        }
+                        /* Hide the default arrow for Firefox */
+                        input[type='range']::-moz-focus-outer { border: 0; }
+                      `}</style>
                       <div className="flex justify-between w-full text-xs mt-2">
                         <span>Start</span>
                         <span>End</span>
@@ -957,6 +975,7 @@ export default function AmbulanceDriverPage() {
                       )}
                     </div>
                   </motion.div>
+                  )}
                 </div>
               ) : (
                 <motion.div
@@ -1129,7 +1148,7 @@ export default function AmbulanceDriverPage() {
                                         ? 'bg-red-100 text-red-800'
                                         : 'bg-gray-100 text-gray-800'
                                   }`}>
-                                  {h.status}
+                                  {ambulanceStatus}
                                 </span>
                               </td>
                             </motion.tr>
@@ -1142,99 +1161,76 @@ export default function AmbulanceDriverPage() {
               )}
             </motion.div>
           )}
-          {activePage === 'profile' && (
-            <motion.div className="bg-white/10 backdrop-blur-md rounded-xl shadow p-6 max-w-md mx-auto border border-white/20" variants={containerVariants} initial="hidden" animate="visible">
-              <h2 className="text-xl font-bold mb-4 text-black">Profile</h2>
+         {activePage === 'profile' && (
+  <motion.div
+    className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8"
+    variants={containerVariants}
+    initial="hidden"
+    animate="visible"
+  >
+    <div className="bg-white/70 backdrop-blur-md rounded-2xl shadow-xl p-8 border border-gray-100">
 
-              {profileLoading && (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
-                  <span className="ml-2 text-black">Loading profile...</span>
-                </div>
-              )}
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-8">
+        <FaAmbulance className="text-blue-600 w-6 h-6" />
+        <h2 className="text-xl font-bold text-gray-800">Ambulance Driver Profile</h2>
+      </div>
 
-              {profileError && (
-                <div className="bg-red-900/50 border border-red-700 text-red-400 p-3 rounded-md mb-4">
-                  {profileError}
-                </div>
-              )}
+      {/* Loading */}
+      {profileLoading && (
+        <motion.div className="text-center py-10 text-blue-600 font-semibold" variants={itemVariants}>
+          Loading profile data...
+        </motion.div>
+      )}
 
-              {!profileLoading && !profileError && (
-                <div className="flex flex-col items-center gap-4">
-                  <img src={AmbulanceDriverImg} alt="avatar" className="w-24 h-24 rounded-full border-2 border-blue-400 shadow-md" />
-                  <div className="font-bold text-lg text-black">{profile.name}</div>
+      {/* Error */}
+      {profileError && (
+        <motion.div className="text-center py-10 text-red-600 font-semibold" variants={itemVariants}>
+          {profileError}
+        </motion.div>
+      )}
 
-                  <div className="w-full space-y-3">
-                    {profile.id && (
-                      <div className="flex items-center gap-2 text-black/80">
-                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                        </svg>
-                        <span>ID: {profile.id}</span>
-                      </div>
-                    )}
+      {/* Profile Data */}
+      {!profileLoading && !profileError && (
+        <motion.div
+          variants={itemVariants}
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-8 border border-gray-200 rounded-xl p-6 bg-gradient-to-br from-white via-blue-50 to-white shadow-sm hover:shadow-md transition-shadow">
 
-                    <div className="flex items-center gap-2 text-black/80">
-                      <FaPhoneAlt className="text-blue-400" />
-                      <span>{profile.phone}</span>
-                    </div>
+            {/* Avatar */}
+            <div className="relative w-32 h-32 shrink-0">
+              <img
+                src={AmbulanceDriverImg}
+                alt="Profile"
+                className="w-full h-full rounded-full object-cover border-4 border-white shadow-md"
+              />
+              <div className="absolute -inset-1 rounded-full bg-blue-400 opacity-10 blur-lg"></div>
+            </div>
 
-                    {profile.email && (
-                      <div className="flex items-center gap-2 text-black/80">
-                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 012 2h4a2 2 0 012 2v1" />
-                        </svg>
-                        <span>{profile.email}</span>
-                      </div>
-                    )}
+            {/* Info Fields */}
+            <div className="w-full">
+              <dl className="divide-y divide-gray-200 text-sm text-gray-700 space-y-3">
+                <ProfileItem icon={<Fingerprint className="text-blue-500 w-4 h-4" />} label="ID" value={profile.id} />
+                <ProfileItem icon={<User className="text-blue-500 w-4 h-4" />} label="Name" value={profile.name} />
+                <ProfileItem icon={<Mail className="text-blue-500 w-4 h-4" />} label="Email" value={profile.email} />
+                <ProfileItem icon={<Phone className="text-blue-500 w-4 h-4" />} label="Phone" value={profile.phone} />
+                <ProfileItem icon={<IdCard className="text-blue-500 w-4 h-4" />} label="Gov ID" value={profile.govId} />
+                <ProfileItem icon={<ClipboardCheck className="text-blue-500 w-4 h-4" />} label="License" value={profile.licenseNumber} />
+                <ProfileItem icon={<FaAmbulance className="text-blue-500 w-4 h-4" />} label="Ambulance No." value={profile.ambulanceRegNumber} />
+              </dl>
+            </div>
 
-                    {profile.licenseNumber && (
-                      <div className="flex items-center gap-2 text-black/80">
-                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <span>License: {profile.licenseNumber}</span>
-                      </div>
-                    )}
+          </div>
 
-                    {profile.govId && (
-                      <div className="flex items-center gap-2 text-black/80">
-                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V4a2 2 0 114 0v2m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
-                        </svg>
-                        <span>Gov ID: {profile.govId}</span>
-                      </div>
-                    )}
+        </motion.div>
+      )}
+    </div>
+  </motion.div>
+)}
 
-                    {profile.ambulanceRegNumber && (
-                      <div className="flex items-center gap-2 text-black/80">
-                        <FaAmbulance className="text-blue-400" />
-                        <span>Ambulance: {profile.ambulanceRegNumber}</span>
-                      </div>
-                    )}
-
-                    {profile.role && (
-                      <div className="flex items-center gap-2 text-black/80">
-                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        <span>Role: {profile.role}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <motion.button
-                    className="mt-4 bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200 shadow-md"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={fetchProfile}
-                  >
-                    Refresh Profile
-                  </motion.button>
-                </div>
-              )}
-            </motion.div>
-          )}
         </main>
       </div>
     </div>
