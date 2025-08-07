@@ -42,10 +42,8 @@ function Login() {
           navigate('/ambulance-driver');
           break;
         case 'FIRE_DRIVER':
-          setPendingFireDriverUser(userInfo);
-          setFireDriverChoice('pending');
-          setLoading(false);
-          return;
+          navigate('/fire-truck-driver');
+          break;
         case 'POLICE_OFFICER':
           navigate('/police-dashboard');
           break;
@@ -71,50 +69,6 @@ function Login() {
       setLoading(false);
     }
   };
-
-
-
-  const navigateToUserDashboard = (userInfo) => {
-    const normalizedRole = userInfo.role?.toUpperCase();
-    switch (normalizedRole) {
-      case 'USER':
-        navigate('/user-dashboard');
-        break;
-      case 'AMBULANCE_DRIVER':
-        navigate('/ambulance-driver');
-        break;
-      case 'FIRE_DRIVER':
-        setPendingFireDriverUser(userInfo);
-        setFireDriverChoice('pending');
-        break;
-      case 'POLICE_OFFICER':
-        navigate('/police-dashboard');
-        break;
-      case 'FIRE_STATION_ADMIN':
-        navigate('/fire-admin-dashboard');
-        break;
-      case 'ADMIN':
-        navigate('/admin-dashboard');
-        break;
-      case 'AMBULANCE_ADMIN':
-        navigate('/ambulance-admin-dashboard');
-        break;
-      case 'POLICE_STATION_ADMIN':
-        navigate('/police-admin-dashboard');
-        break;
-      default:
-        navigate('/');
-    }
-  };
-
-  const handleFireDriverChoice = (choice) => {
-    if (!pendingFireDriverUser) return;
-    if (choice === 'admin') navigate('/fire-dashboard');
-    else if (choice === 'driver') navigate('/fire-truck-driver');
-  };
-
-
-
 
 
   return (
@@ -177,29 +131,7 @@ function Login() {
               }}>
                 Welcome Back
               </h2>
-              <p className="text-cyan-100 text-sm font-medium">Access your emergency services dashboard</p>
-            </div>
-
-            {fireDriverChoice === 'pending' ? (
-              <div className="py-8 px-6 flex flex-col items-center">
-                <h3 className="text-xl font-semibold text-white mb-6">Choose Your Fire Role</h3>
-                <div className="flex gap-4 mb-6">
-                  <button 
-                    onClick={() => handleFireDriverChoice('admin')} 
-                    className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-8 py-4 rounded-xl font-semibold hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-                  >
-                    Fire Admin
-                  </button>
-                  <button 
-                    onClick={() => handleFireDriverChoice('driver')} 
-                    className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-8 py-4 rounded-xl font-semibold hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-                  >
-                    Fire Truck Driver
-                  </button>
-                </div>
-                <p className="text-white/80 text-sm">Select your role to continue.</p>
-              </div>
-            ) : (
+            </div> 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2">Email Address</label>
@@ -262,7 +194,7 @@ function Login() {
                   </div>
                 )}
               </form>
-            )}
+            
 
 
 

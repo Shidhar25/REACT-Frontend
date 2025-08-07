@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { FaFireExtinguisher, FaPhoneAlt, FaHome, FaBook, FaUser, FaSignOutAlt } from 'react-icons/fa';
+import { FaFireExtinguisher, FaPhoneAlt, FaHome, FaBook, FaUser, FaSignOutAlt, FaTruck } from 'react-icons/fa';
 import { MdLocationOn, MdHistory, MdPerson } from 'react-icons/md';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { UserIcon, HomeIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { ClipboardCheck, ShieldCheck, User, Phone, Mail, Fingerprint, IdCard } from 'lucide-react';
 import reactLogo from '../../assets/react-logo.png';
 import fireDriverImg from '../../assets/fireDriver.png';
 // IMPORTANT: Replace with your actual Google Maps API Key and consider environment variables
@@ -70,6 +71,16 @@ const completionOverlayVariants = {
   visible: { x: "0%", opacity: 1, transition: { type: "spring", stiffness: 100, damping: 20 } },
   exit: { x: "-100%", opacity: 0, transition: { ease: "easeOut", duration: 0.5 } }
 };
+
+const ProfileItem = ({ icon, label, value }) => (
+  <div className="flex items-center space-x-3 pt-2">
+    <div className="w-5 h-5">{icon}</div>
+    <div className="flex justify-between w-full">
+      <span className="text-gray-500">{label}:</span>
+      <span className="font-medium text-gray-800">{value}</span>
+    </div>
+  </div>
+);
 
 export default function FireTruckDriverPage() {
   const [appointment, setAppointment] = useState(null);
@@ -694,7 +705,7 @@ export default function FireTruckDriverPage() {
       </aside>
 
       {/* Top Bar */}
-      <div className="border-b border-gray-200 bg-[#E8E6E0]" >
+      <div className="border-b border-gray-200 " >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           {/* Hamburger for mobile */}
           <button className="md:hidden text-2xl" onClick={() => setSidebarOpen(true)}>
@@ -730,7 +741,7 @@ export default function FireTruckDriverPage() {
 
 <div className="w-full max-w-7xl mx-auto">
   {/* Horizontal Navbar - Enhanced Styling */}
-  <div className="w-full flex justify-center bg-[#E8E6E0] py-4 sm:py-6">
+  <div className="w-full flex justify-center py-4 sm:py-6">
     <nav
       className="bg-[#fef4f4] border border-red-200 rounded-full shadow-lg px-2 sm:px-4 py-2 flex space-x-2 sm:space-x-4 overflow-x-auto max-w-full sm:max-w-3xl"
       style={{ backgroundColor: '#fff4f4' }}
@@ -1165,99 +1176,75 @@ export default function FireTruckDriverPage() {
               )}
             </motion.div>
           )}
-          {activePage === 'profile' && (
-            <motion.div className="bg-white/10 backdrop-blur-md rounded-xl shadow p-6 max-w-md mx-auto border border-white/20" variants={containerVariants} initial="hidden" animate="visible">
-              <h2 className="text-xl font-bold mb-4 text-black">Profile</h2>
+         {activePage === 'profile' && (
+  <motion.div
+    className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8"
+    variants={containerVariants}
+    initial="hidden"
+    animate="visible"
+  >
+    <div className="bg-white/70 backdrop-blur-md rounded-2xl shadow-xl p-8 border border-gray-100">
 
-              {profileLoading && (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
-                  <span className="ml-2 text-black">Loading profile...</span>
-                </div>
-              )}
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-8">
+        <FaFireExtinguisher className="text-red-600 w-6 h-6" />
+        <h2 className="text-xl font-bold text-gray-800">Fire Truck Driver Profile</h2>
+      </div>
 
-              {profileError && (
-                <div className="bg-red-900/50 border border-red-700 text-red-400 p-3 rounded-md mb-4">
-                  {profileError}
-                </div>
-              )}
+      {/* Loading */}
+      {profileLoading && (
+        <motion.div className="text-center py-10 text-blue-600 font-semibold" variants={itemVariants}>
+          Loading profile data...
+        </motion.div>
+      )}
 
-              {!profileLoading && !profileError && (
-                <div className="flex flex-col items-center gap-4">
-                  <img src={fireDriverImg} alt="avatar" className="w-24 h-24 rounded-full border-2 border-blue-400 shadow-md" />
-                  <div className="font-bold text-lg text-black">{profile.name}</div>
+      {/* Error */}
+      {profileError && (
+        <motion.div className="text-center py-10 text-red-600 font-semibold" variants={itemVariants}>
+          {profileError}
+        </motion.div>
+      )}
 
-                  <div className="w-full space-y-3">
-                    {profile.id && (
-                      <div className="flex items-center gap-2 text-black/80">
-                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                        </svg>
-                        <span>ID: {profile.id}</span>
-                      </div>
-                    )}
+      {/* Profile Data */}
+      {!profileLoading && !profileError && (
+        <motion.div
+          variants={itemVariants}
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-8 border border-gray-200 rounded-xl p-6 bg-gradient-to-br from-white via-blue-50 to-white shadow-sm hover:shadow-md transition-shadow">
 
-                    <div className="flex items-center gap-2 text-black/80">
-                      <FaPhoneAlt className="text-blue-400" />
-                      <span>{profile.phone}</span>
-                    </div>
+            {/* Avatar */}
+            <div className="relative w-32 h-32 shrink-0">
+              <img
+                src={fireDriverImg}
+                alt="Profile"
+                className="w-full h-full rounded-full object-cover border-4 border-white shadow-md"
+              />
+              <div className="absolute -inset-1 rounded-full bg-red-400 opacity-10 blur-lg"></div>
+            </div>
 
-                    {profile.email && (
-                      <div className="flex items-center gap-2 text-black/80">
-                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 012 2h4a2 2 0 012 2v1" />
-                        </svg>
-                        <span>{profile.email}</span>
-                      </div>
-                    )}
+            {/* Info Fields */}
+            <div className="w-full">
+              <dl className="divide-y divide-gray-200 text-sm text-gray-700 space-y-3">
+                <ProfileItem icon={<Fingerprint className="text-red-500 w-4 h-4" />} label="ID" value={profile.id} />
+                <ProfileItem icon={<User className="text-red-500 w-4 h-4" />} label="Name" value={profile.name} />
+                <ProfileItem icon={<Mail className="text-red-500 w-4 h-4" />} label="Email" value={profile.email} />
+                <ProfileItem icon={<Phone className="text-red-500 w-4 h-4" />} label="Phone" value={profile.phone} />
+                <ProfileItem icon={<IdCard className="text-red-500 w-4 h-4" />} label="Gov ID" value={profile.govId} />
+                <ProfileItem icon={<ClipboardCheck className="text-red-500 w-4 h-4" />} label="License" value={profile.licenseNumber} />
 
-                    {profile.licenseNumber && (
-                      <div className="flex items-center gap-2 text-black/80">
-                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <span>License: {profile.licenseNumber}</span>
-                      </div>
-                    )}
+              </dl>
+            </div>
 
-                    {profile.govId && (
-                      <div className="flex items-center gap-2 text-black/80">
-                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V4a2 2 0 114 0v2m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
-                        </svg>
-                        <span>Gov ID: {profile.govId}</span>
-                      </div>
-                    )}
+          </div>
 
-                    {profile.fireTruckRegNumber && ( // Changed from ambulanceRegNumber
-                      <div className="flex items-center gap-2 text-black/80">
-                        <FaFireExtinguisher className="text-blue-400" /> {/* Changed icon */}
-                        <span>Fire Truck: {profile.fireTruckRegNumber}</span>
-                      </div>
-                    )}
-
-                    {profile.role && (
-                      <div className="flex items-center gap-2 text-black/80">
-                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        <span>Role: {profile.role}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <motion.button
-                    className="mt-4 bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200 shadow-md"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={fetchProfile}
-                  >
-                    Refresh Profile
-                  </motion.button>
-                </div>
-              )}
-            </motion.div>
-          )}
+        </motion.div>
+      )}
+    </div>
+  </motion.div>
+)}
         </main>
       </div>
     </div>

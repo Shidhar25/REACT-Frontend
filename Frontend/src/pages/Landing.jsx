@@ -5,7 +5,7 @@ import { motion, useMotionValue, useSpring } from 'framer-motion';
 import Button from '../buttons/Buttons';
 import reactLogo from '../assets/react-logo.png';
 import bgVideo from '../assets/page1.mp4';
-// import gridBg from '../assets/gridBg.jpg';
+import gridBg from '../assets/gridBg.jpg';
 import bgImage from '../assets/bgImage.jpg';
 import { REACT_PHRASES } from '../constants/landingContent';
 import { RevealLinks }  from '../components/common/FlipTagLine.jsx';
