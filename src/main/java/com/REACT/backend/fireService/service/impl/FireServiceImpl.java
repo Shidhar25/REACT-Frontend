@@ -156,6 +156,7 @@ public class FireServiceImpl  implements FireService {
 
         if (ambulancesCompleted && fireTrucksCompleted && policeCompleted) {
             requestEntity.setEmergencyRequestStatus(EmergencyRequestStatus.COMPLETED);
+            requestEntity.setLastUpdated(Instant.now());
             emergencyRequestRepo.save(requestEntity);
             log.info("Emergency request {} marked as COMPLETED", requestEntity.getId());
         }

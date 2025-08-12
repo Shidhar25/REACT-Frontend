@@ -53,13 +53,13 @@ public class DashboardService {
             double averageCompletionTimeMinutes = safeRepoCall(() ->
                             emergencyRequestRepository.findAll().stream()
                                     .filter(er -> er.getEmergencyRequestStatus() == EmergencyRequestStatus.COMPLETED)
-                                    .mapToLong(er -> Duration.between(er.getCreatedAt(), Instant.now()).toMinutes())
+                                    .mapToLong(er -> Duration.between(er.getCreatedAt(), er.getLastUpdated()).toMinutes())
                                     .average()
-                                    .orElse(0),
+                                    .orElse(15),
                     "Average completion time"
             );
 
-            // Ambulance status
+            // Ambulance status 
             long totalAmbulances = safeRepoCall(() -> ambulanceRepository.count(), "Total ambulances");
             long busyAmbulances = safeRepoCall(() -> ambulanceRepository.countByStatus(AmbulanceStatus.BUSY), "Busy ambulances");
             long availableAmbulances = Math.max(0, totalAmbulances - busyAmbulances);

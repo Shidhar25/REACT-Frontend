@@ -1148,7 +1148,7 @@ export default function AmbulanceDriverPage() {
                                         ? 'bg-red-100 text-red-800'
                                         : 'bg-gray-100 text-gray-800'
                                   }`}>
-                                  {ambulanceStatus}
+                                  {h.status}
                                 </span>
                               </td>
                             </motion.tr>

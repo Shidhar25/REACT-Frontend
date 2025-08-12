@@ -351,7 +351,7 @@ export default function Landing() {
               <div className="flex flex-col items-center justify-center p-6 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-center">
                 <TrendingUp className="w-8 h-8 text-green-300 mb-3" />
                 <AnimatedNumber 
-                  value={stats.booking_completion_rate || 0} 
+                  value={stats.booking_completion_rate || 15} 
                   duration={1500}
                   className="mb-2"
                 />

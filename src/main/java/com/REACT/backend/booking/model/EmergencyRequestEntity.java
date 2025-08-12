@@ -68,6 +68,7 @@ public class EmergencyRequestEntity {
     private EmergencyRequestStatus emergencyRequestStatus = EmergencyRequestStatus.PENDING;
 
     private Instant createdAt = Instant.now();
+    private  Instant lastUpdated;
 
 
     @ElementCollection

@@ -210,6 +210,8 @@ export default function Tracking() {
                         <>
                           <b>Driver:</b> {ambulances[0].driverName || "-"}<br />
                           <b>Reg:</b> {ambulances[0].regNumber || "-"}
+                          <b>Phone:</b>{ambulances[0].driverPhone || "-"}
+
                           {ambulances[0].driverPhone && (
                             <a
                               href={`tel:${ambulances[0].driverPhone}`}
@@ -284,6 +286,8 @@ export default function Tracking() {
                     <div key={truck.id || idx} className="text-black text-xs font-normal mb-2 flex items-center gap-2">
                       <b>Truck id:</b> {truck.regNumber || truck.id}<br />
                       <b>Status:</b> {truck.status}<br />
+                      <b>Driver:</b> {truck.driverName || "-"}<br />
+                      <b>Phone:</b> {truck.driverPhoneNumber || "-"}
                       {truck.driverPhoneNumber && (
                         <a
                           href={`tel:${truck.driverPhoneNumber}`}

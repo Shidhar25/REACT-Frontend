@@ -1083,7 +1083,7 @@ const fetchEmergencyHistory = async () => {
                 >
                   <StatCard
                     title="Avg Response Time"
-                    value={`${dashboardStats.average_completion_time_minutes} min`}
+                    value={`${dashboardStats.average_completion_time_minutes.toFixed(2)} min`}
                     subtitle="Emergency response"
                     icon={<ClockIcon className="h-6 w-6 text-gray-600" />}
                     bgColorClass="bg-gradient-to-tr from-gray-100 to-white"

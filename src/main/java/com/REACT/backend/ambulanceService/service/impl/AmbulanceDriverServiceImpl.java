@@ -181,6 +181,7 @@ public class AmbulanceDriverServiceImpl {
         if (ambulancesCompleted && fireTrucksCompleted && policeCompleted) {
             requestEntity.setEmergencyRequestStatus(
                     com.REACT.backend.booking.model.EmergencyRequestStatus.COMPLETED);
+            requestEntity.setLastUpdated(Instant.now());
             emergencyRequestRepo.save(requestEntity);
             log.info("Emergency request {} marked as COMPLETED", requestEntity.getId());
         }
